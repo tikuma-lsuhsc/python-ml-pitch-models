@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools >= 61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[project]
+name = "fcn-f0"
+description = "Monophonic pitch (F0) estimation using the fully-convolutional neural network models"
+readme = "README.md"
+keywords = []
+license = { text = "MIT License" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    'Topic :: Multimedia :: Sound/Audio :: Analysis',
+]
+dynamic = ["version"]
+requires-python = ">=3.8"
+dependencies = ["tensorflow", "hmmlearn"]
+
+[project.urls]
+Repository = "https://github.com/tikuma-lsuhsc/python-fcn-f0"
+
+[tool.setuptools.dynamic]
+version = { attr = "fcn_f0.__version__" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# minversion = "6.0"
+# addopts = "-ra -q"
