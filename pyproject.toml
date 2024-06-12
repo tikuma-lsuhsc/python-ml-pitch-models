@@ -16,13 +16,44 @@ classifiers = [
 ]
 dynamic = ["version"]
 requires-python = ">=3.8"
-dependencies = ["tensorflow", "hmmlearn"]
+dependencies = ["numpy", "tensorflow", "hmmlearn"]
 
 [project.urls]
 Repository = "https://github.com/tikuma-lsuhsc/python-fcn-f0"
 
 [tool.setuptools.dynamic]
 version = { attr = "fcn_f0.__version__" }
+
+[project.optional-dependencies]
+ALL_WEIGHTS = [
+    "fcn-f0-data-fcn-929",
+    "fcn-f0-data-fcn-993",
+    "fcn-f0-data-fcn-1953",
+    "fcn-f0-data-crepe-full",
+    "fcn-f0-data-crepe-large",
+    "fcn-f0-data-crepe-medium",
+    "fcn-f0-data-crepe-small",
+    "fcn-f0-data-crepe-tiny",
+]
+FCN_WEIGHTS = [
+    "fcn-f0-data-fcn-929",
+    "fcn-f0-data-fcn-993",
+    "fcn-f0-data-fcn-1953",
+]
+CREPE_WEIGHTS = [
+    "fcn-f0-data-crepe-full",
+    "fcn-f0-data-crepe-large",
+    "fcn-f0-data-crepe-medium",
+    "fcn-f0-data-crepe-small",
+    "fcn-f0-data-crepe-tiny",
+]
+FCN_1953_WEIGHTS = ["fcn-f0-data-fcn-1953"]
+FCN_993_WEIGHTS = ["fcn-f0-data-fcn-993"]
+FCN_929_WEIGHTS = ["fcn-f0-data-fcn-929"]
+CREPE_LARGE_WEIGHTS = ["fcn-f0-data-crepe-large"]
+CREPE_MEDIUM_WEIGHTS = ["fcn-f0-data-crepe-medium"]
+CREPE_SMALL_WEIGHTS = ["fcn-f0-data-crepe-small"]
+CREPE_TINY_WEIGHTS = ["fcn-f0-data-crepe-tiny"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,1 +1,2 @@
--e .
+-e .[ALL_WEIGHTS]
+-r tests/requirements.txt
