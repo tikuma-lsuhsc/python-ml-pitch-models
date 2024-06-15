@@ -47,9 +47,11 @@ CREPE_WEIGHTS = [
     "fcn-f0-data-crepe-small",
     "fcn-f0-data-crepe-tiny",
 ]
+DEFAULT_WEIGHTS = ["fcn-f0-data-fcn-993"]
 FCN_1953_WEIGHTS = ["fcn-f0-data-fcn-1953"]
 FCN_993_WEIGHTS = ["fcn-f0-data-fcn-993"]
 FCN_929_WEIGHTS = ["fcn-f0-data-fcn-929"]
+CREPE_FULL_WEIGHTS = ["fcn-f0-data-crepe-full"]
 CREPE_LARGE_WEIGHTS = ["fcn-f0-data-crepe-large"]
 CREPE_MEDIUM_WEIGHTS = ["fcn-f0-data-crepe-medium"]
 CREPE_SMALL_WEIGHTS = ["fcn-f0-data-crepe-small"]
