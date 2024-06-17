@@ -1,2 +1,4 @@
 jupyter
 matplotlib
+praat-parselmouth
+librosa
