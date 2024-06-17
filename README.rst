@@ -1,6 +1,6 @@
 
-FCN-F0 - A collection of ML-based pitch detector Python Tensorflow models
-*************************************************************************
+``ml-pitch-models`` - A collection of ML-based pitch detector Python Tensorflow models
+**************************************************************************************
 
 
 Description
@@ -8,8 +8,8 @@ Description
 
 This Python package features two deep-learning pitch detection models.
 
-1. *CrepeModel* - CREPE: deep convolutional neural network (CNN) model
-   (5 pretrained weights)
+1. ``CrepeModel`` - CREPE: deep convolutional neural network (CNN)
+   model (5 pretrained weights)
 
    J. W. Kim, J. Salamon, P. Li, J. P. Bello. “CREPE: A Convolutional
    Representation for Pitch Estimation”, Proc. IEEE ICASSP, 2018. doi:
@@ -17,7 +17,7 @@ This Python package features two deep-learning pitch detection models.
 
    GitHub Repository: https://github.com/marl/crepe
 
-2. *FcnF0Model* - FCN-F0: fully convolutional network (FCN) model (3
+2. ``FcnF0Model`` - FCN-F0: fully convolutional network (FCN) model (3
    pretrained weights)
 
    L. Ardaillon and A. Roebel, “Fully-Convolutional Network for Pitch
@@ -39,33 +39,33 @@ To install just the models *without* any pretrained weights:
 
 .. code:: bash
 
-   pip install fcn_f0
+   pip install ml-pitch-models
 
 Each set of pretrained weights is available as a separate PyPI
 package, and they can be installed using *pip*’s the optional extra
 dependency specifiers.
 
 Based on Ardaillon and Roebel’s choice, the (current) default model
-for *fcn_f0.predict()* is the *FCN-993* model, and to include the
-pretrained weights of the default model:
+for *ml_pitch_models.predict()* is the *FCN-993* model, and to include
+the pretrained weights of the default model:
 
 .. code:: bash
 
-   pip install fcn_f0[DEFAULT_WEIGHTS]
+   pip install ml-pitch-models[DEFAULT_WEIGHTS]
 
 To install individual pretrained weights, use the following extra
 dependency keywords or a combination thereof.
 
 .. code:: bash
 
-   pip install fcn_f0[CREPE_FULL_WEIGHTS]
-   pip install fcn_f0[CREPE_LARGE_WEIGHTS]
-   pip install fcn_f0[CREPE_MEDIUM_WEIGHTS]
-   pip install fcn_f0[CREPE_SMALL_WEIGHTS]
-   pip install fcn_f0[CREPE_TINY_WEIGHTS]
-   pip install fcn_f0[FCN_1953_WEIGHTS]
-   pip install fcn_f0[FCN_993_WEIGHTS]
-   pip install fcn_f0[FCN_929_WEIGHTS]
+   pip install ml-pitch-models[CREPE_FULL_WEIGHTS]
+   pip install ml-pitch-models[CREPE_LARGE_WEIGHTS]
+   pip install ml-pitch-models[CREPE_MEDIUM_WEIGHTS]
+   pip install ml-pitch-models[CREPE_SMALL_WEIGHTS]
+   pip install ml-pitch-models[CREPE_TINY_WEIGHTS]
+   pip install ml-pitch-models[FCN_1953_WEIGHTS]
+   pip install ml-pitch-models[FCN_993_WEIGHTS]
+   pip install ml-pitch-models[FCN_929_WEIGHTS]
 
 
 Tensorflow Installation
@@ -91,14 +91,14 @@ kHz (``fs=8000``)
 
 .. code:: python
 
-   import fcn_f0
+   import ml_pitch_models
 
-   t, f0, conf = fcn_f0.predict(fs, x)
+   t, f0, conf = ml_pitch_models.predict(fs, x)
 
 computes the pitch estimates ``f0`` with the default model
 ``fcn_993``. The estimates are generated with a sliding window of size
-993 **An :code:`f0` value of zero indicates that no pitch was
-detected** in that window.
+993 An ``f0`` value of zero indicates that no pitch was detected in
+that window.
 
 The timestamps ``t`` is a sequence of the timestamps of the middle of
 the window. By default, ``t[0]=0`` and ``t[-1]`` is the last window
@@ -108,12 +108,12 @@ The last output ``conf`` is the confidence levels of the estimates.
 This is the maximum value of the DL classifier layer if pitch is
 detected or ``1-max`` if no pitch is detected.
 
-The third argument of ``fcn_f0.predict`` is the DL model to use. To
-find the available pretrained models, run
+The third argument of ``ml_pitch_models.predict`` is the DL model to
+use. To find the available pretrained models, run
 
 .. code:: python
 
-   fcn_f0.available_models() # returns a list of model names
+   ml_pitch_models.available_models() # returns a list of model names
 
 Possible model names are: ``"crepe_full"``, ``"crepe_large"``,
 ``"crepe_medium"``, ``"crepe_small"``, ``"crepe_tiny"``,
@@ -126,7 +126,7 @@ signals. In other words,
 
 .. code:: python
 
-   t, f0, conf = fcn_f0.predict(fs, x, 'crepe_large')
+   t, f0, conf = ml_pitch_models.predict(fs, x, 'crepe_large')
 
 will throw a ``ValueError`` exception because the signal sampling rate
 ``fs`` does not match the model’s input sampling rate (16 kHz). The
@@ -146,8 +146,8 @@ this mode of operation (default to the continuous operation):
 
 .. code:: python
 
-   t_cont, f0_cont, conf_cont = fcn_f0.predict(fs, x, 'fcn_929', framewise=False) # default for FCN-F0
-   t_batch, f0_batch, conf_batch = fcn_f0.predict(fs, x, 'fcn_929', framewise=True, hop=400) # 50-ms hop size
+   t_cont, f0_cont, conf_cont = ml_pitch_models.predict(fs, x, 'fcn_929', framewise=False) # default for FCN-F0
+   t_batch, f0_batch, conf_batch = ml_pitch_models.predict(fs, x, 'fcn_929', framewise=True, hop=400) # 50-ms hop size
 
 The batch mode (``framewise=True``, which is the only mode CREPE model
 opearates in) allows a model-independent hop size (``hop`` argument,
@@ -165,7 +165,7 @@ have 3 1D signals: ``x0```, ``x1``, and ``x2``:
 
    import numpy as np
 
-   t, f0, conf = fcn_f0.predict(fs, np.stack([x0, x1, x2], axis=0))
+   t, f0, conf = ml_pitch_models.predict(fs, np.stack([x0, x1, x2], axis=0))
 
 Then, ``f0`` and ``conf`` are 2D arrays with 3 rows, corresponding to
 the input signals.
@@ -177,9 +177,11 @@ faster execution as the model is only constructed once.
 API Reference
 =============
 
-**class fcn_f0.predict(x: ArrayLike, fs: int, model:
-PretrainedModelName | FcnF0Model | CrepeModel = 'fcn_993', framewise:
-bool | None = None, voice_threshold: float = 0.5, **kwargs)**
+**class ml_pitch_models.predict(x: ArrayLike, fs: int, model:
+Literal['crepe_full', 'crepe_large', 'crepe_medium', 'crepe_small',
+'crepe_tiny', 'fcn_1953', 'fcn_929', 'fcn_993'] | FcnF0Model |
+CrepeModel = 'fcn_993', framewise: bool | None = None,
+voice_threshold: float = 0.5, **kwargs)**
 
    Generates pitch predictions for the input signal.
 
@@ -255,7 +257,7 @@ bool | None = None, voice_threshold: float = 0.5, **kwargs)**
    :Return type:
       tuple[np.ndarray, np.ndarray, np.ndarray]
 
-**class fcn_f0.CrepeModel(*args, **kwargs)**
+**class ml_pitch_models.CrepeModel(*args, **kwargs)**
 
    CREPE pitch estimation model
 
@@ -384,7 +386,7 @@ bool | None = None, voice_threshold: float = 0.5, **kwargs)**
       :Return type:
          tuple[np.ndarray, np.ndarray, np.ndarray]
 
-**class fcn_f0.FcnF0Model(*args, **kwargs)**
+**class ml_pitch_models.FcnF0Model(*args, **kwargs)**
 
    ``property bin_frequencies: ndarray``
 

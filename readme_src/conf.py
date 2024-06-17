@@ -17,11 +17,11 @@ from typing import get_args
 
 os.environ["TF_ENABLE_ONEDNN_OPTS"] = "0"
 
-import fcn_f0
+# import ml_pitch_models
 
 # -- Project information -----------------------------------------------------
 
-project = "python-fcn-f0"
+project = "python-ml-pitch-models"
 copyright = (
     "2024, Takeshi (Kesh) Ikuma, Louisiana State University Health Sciences Center",
     "2019 Luc Ardaillon",
@@ -29,7 +29,7 @@ copyright = (
 )
 author = "Takeshi (Kesh) Ikuma"
 
-release = fcn_f0.__version__
+# release = ml_pitch_models.__version__
 
 # -- General configuration ---------------------------------------------------
 

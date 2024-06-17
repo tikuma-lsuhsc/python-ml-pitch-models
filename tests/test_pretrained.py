@@ -3,7 +3,7 @@ import numpy as np
 
 from matplotlib import pyplot as plt
 
-from fcn_f0.pretrained import *
+from ml_pitch_models.pretrained import *
 
 print(available_models())
 

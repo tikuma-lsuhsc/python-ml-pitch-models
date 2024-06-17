@@ -37,7 +37,7 @@ fs, x = wavfile.read("tests/test_crepe.wav")
 # export LD_LIBRARY_PATH="$CUDNN_PATH/lib":"/usr/local/cuda/lib64"
 
 # exit()
-from fcn_f0 import pretrained as models, utils
+from ml_pitch_models import pretrained as models, utils
 
 # model = models.CrepeFullModel()
 # model = models.CrepeSmallModel()

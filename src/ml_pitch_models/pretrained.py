@@ -36,7 +36,7 @@ def get_weights_path(model: PretrainedModelName) -> str:
     """
     weights_path = path.join(
         sysconfig.get_path("purelib"),
-        "fcn_f0",
+        "ml_pitch_models",
         "data",
         model,
         "weights.h5",
@@ -44,9 +44,9 @@ def get_weights_path(model: PretrainedModelName) -> str:
 
     if not path.exists(weights_path):
         raise FileNotFoundError(
-            f"'{model}' weights has not been installed. Run pip install fcn-f0-data-{model.replace('_','-')}"
+            f"'{model}' weights has not been installed. Run pip install ml_pitch_models-data-{model.replace('_','-')}"
             if model in get_args(PretrainedModelName)
-            else f"'{model}' is not a valid pre-trained model name. Run fcn_f0.available_models() to get a list of installed models."
+            else f"'{model}' is not a valid pre-trained model name. Run ml_pitch_models.available_models() to get a list of installed models."
         )
 
     return weights_path
@@ -59,7 +59,7 @@ def available_models() -> list[str]:
     Returns:
         list[str]: list of available models
     """
-    root_dir = path.join(sysconfig.get_path("purelib"), "fcn_f0", "data")
+    root_dir = path.join(sysconfig.get_path("purelib"), "ml_pitch_models", "data")
     files = glob(
         path.join("*", "weights.h5"),
         root_dir=root_dir,
