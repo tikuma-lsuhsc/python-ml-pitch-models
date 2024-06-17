@@ -7,6 +7,8 @@ import os
 from os import path
 import subprocess
 
+import conf_cuda
+
 # ## Settings
 module_name = "fcn_f0"
 author_name = "Takeshi Ikuma (LSUHSC)"
@@ -19,6 +21,7 @@ arguments = [
     "-b",
     "rst",
     "-v",
+    "--keep-going",
     src_dir,
     build_dir,
 ]
