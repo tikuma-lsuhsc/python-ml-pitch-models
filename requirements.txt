@@ -1,2 +1,4 @@
 -e .[ALL_WEIGHTS]
 -r tests/requirements.txt
+-r scripts/requirements.txt
+-r examples/requirements.txt

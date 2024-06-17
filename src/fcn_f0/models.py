@@ -54,20 +54,27 @@ class CrepeModel(Model):
     Args:
         *layers (sequence of LayerInfo): Variable length argument list to define
             CNN layers.
+
         weights_file (str, optional): path to the weights file to load. It can
             either be a .weights.h5 file or a legacy .h5 weights file. Defaults
             to None.
+
         nb_input (int | None, optional): input frame size. Defaults to None to
             use the class default (1024).
+
         nb_freq_bins (int | None, optional): classifier output size. Defaults to
             None to use the class default (360).
+
         return_f0 (bool, optional): True to return pitch estimates in Hz.
             Defaults to False to return classifier output.
+
         framewise (bool | None, optional): True to transform the input to a
             sequence of sliding window frames. This option must be True or None
             for CrepeModel. Defaults to True.
+
         voice_threshold (float | None, optional): Classifier output threshold to
             detect voice. Defaults to None (uses the class default of 0.5.).
+
         dropout (float, optional): dropout rate (training only). Defaults to 0.25.
     """
 
@@ -235,51 +242,63 @@ class CrepeModel(Model):
             x: NumPy array (or array-like). Input signal(s). For a higher
                 dimensional array, the pitch is detected along the last
                 dimension.
+
             fs: Integer. Input signal sampling rate in Samples/second. This must
                 match model.fs.
+
             hop: Integer. The increment in signal samples, by which the window
                 is shifted in each step for frame-wise processing. If None, hop
                 size of (roughly) 10 ms is used
+
             p0: Integer. The first element of the range of slices to calculate.
                 If None then it is set to p_min, which is the smallest possible
                 slice.
+
             p1: Integer or None. The end of the array. If None then the largest
                 possible slice is used.
+
             k_offset: Integer. Index of first sample (t = 0) in x.
+
             padding: PAD_TYPE. Kind of values which are added, when the sliding window sticks out on
                 either the lower or upper end of the input x. Zeros are added if the default ‘zeros’
                 is set. For ‘edge’ either the first or the last value of x is used. ‘even’ pads by
                 reflecting the signal on the first or last sample and ‘odd’ additionally multiplies
                 it with -1.
+
             batch_size: Integer or `None`.
                 Number of samples per batch.
                 If unspecified, `batch_size` will default to 32.
                 Do not specify the `batch_size` if your data is in the
                 form of dataset, generators, or `keras.utils.PyDataset`
                 instances (since they generate batches).
+
             verbose: `"auto"`, 0, 1, or 2. Verbosity mode.
                 0 = silent, 1 = progress bar, 2 = single line.
                 `"auto"` becomes 1 for most cases. Note that the progress bar
                 is not particularly useful when logged to a file,
                 so `verbose=2` is recommended when not running interactively
                 (e.g. in a production environment). Defaults to `"auto"`.
+
             steps: Total number of steps (batches of samples)
                 before declaring the prediction round finished.
                 Ignored with the default value of `None`.
                 If `x` is a `tf.data.Dataset` and `steps` is `None`,
                 `predict()` will run until the input dataset is exhausted.
+
             callbacks: List of `keras.callbacks.Callback` instances.
                 List of callbacks to apply during prediction.
 
         Returns:
-            If self.return_f0 is true:
-                t:  NumPy array of frame time stamps
-                f0: NumPy array of pitch predictions
-                confidence: NumPy array of pitch prediction confidence
-            If self.return_f0 is false:
-                f:  NumPy array of frequencies of classifier bins
-                t:  NumPy array of frame time stamps
-                P:  NumPy array(s) of classifier output
+            tuple[np.ndarray, np.ndarray, np.ndarray]:
+                If self.return_f0 is true:
+                    - t:  frame time stamps
+                    - f0: predicted pitches
+                    - confidence: pitch prediction confidences
+
+                If self.return_f0 is false:
+                    - f:  frequencies of classifier bins
+                    - t:  frame time stamps
+                    - P:  classifier output
         """
 
         if fs != self.fs:
@@ -332,18 +351,24 @@ class FcnF0Model(Model):
     Args:
         *layers (sequence of LayerInfo): Variable length argument list to define
             CNN layers.
+
         weights_file (str, optional): path to the weights file to load. It can
             either be a .weights.h5 file or a legacy .h5 weights file. Defaults
             to None.
+
         nb_freq_bins (int | None, optional): classifier output size. Defaults to
             None to use the class default (360).
+
         return_f0 (bool, optional): True to return pitch estimates in Hz.
             Defaults to False to return classifier output.
+
         framewise (bool | None, optional): True to transform the input to a
             sequence of sliding window frames. This option must be True or None
             for CrepeModel. Defaults to False.
+
         voice_threshold (float | None, optional): Classifier output threshold to
             detect voice. Defaults to None (uses the class default of 0.5.).
+
         dropout (float, optional): dropout rate (training only). Defaults to 0.25.
     """
 
@@ -532,53 +557,66 @@ class FcnF0Model(Model):
             x: NumPy array (or array-like). Input signal(s). For a higher
                 dimensional array, the pitch is detected along the last
                 dimension.
+
             fs: Integer. Input signal sampling rate in Samples/second. This must
                 match model.fs.
+
             hop: Integer. The increment in signal samples, by which the window
                 is shifted in each step for frame-wise processing. If None, hop
                 size of (roughly) 10 ms is used. For stream processing, this argument
                 is ignored and the native hop size (self.native_hop) of the model
                 is used instead.
+
             p0: Integer. The first element of the range of slices to calculate.
                 If None then it is set to p_min, which is the smallest possible
                 slice.
+
             p1: Integer or None. The end of the array. If None then the largest
                 possible slice is used.
+
             k_offset: Integer. Index of first sample (t = 0) in x.
+
             padding: PAD_TYPE. Kind of values which are added, when the sliding window sticks out on
                 either the lower or upper end of the input x. Zeros are added if the default ‘zeros’
                 is set. For ‘edge’ either the first or the last value of x is used. ‘even’ pads by
                 reflecting the signal on the first or last sample and ‘odd’ additionally multiplies
                 it with -1.
+
             batch_size: Integer or `None`.
                 Number of samples per batch.
                 If unspecified, `batch_size` will default to 32.
                 Do not specify the `batch_size` if your data is in the
                 form of dataset, generators, or `keras.utils.PyDataset`
                 instances (since they generate batches).
+
             verbose: `"auto"`, 0, 1, or 2. Verbosity mode.
                 0 = silent, 1 = progress bar, 2 = single line.
                 `"auto"` becomes 1 for most cases. Note that the progress bar
                 is not particularly useful when logged to a file,
                 so `verbose=2` is recommended when not running interactively
                 (e.g. in a production environment). Defaults to `"auto"`.
+
             steps: Total number of steps (batches of samples)
                 before declaring the prediction round finished.
                 Ignored with the default value of `None`.
                 If `x` is a `tf.data.Dataset` and `steps` is `None`,
                 `predict()` will run until the input dataset is exhausted.
+
             callbacks: List of `keras.callbacks.Callback` instances.
                 List of callbacks to apply during prediction.
 
         Returns:
-            If self.return_f0 is true:
-                t:  NumPy array of frame time stamps
-                f0: NumPy array(s) of pitch predictions
-                confidence: NumPy array of pitch prediction confidence
-            If self.return_f0 is false:
-                f:  NumPy array of frequencies of classifier bins
-                t:  NumPy array of frame time stamps
-                P:  NumPy array(s) of classifier output
+            tuple[np.ndarray, np.ndarray, np.ndarray]:
+                If self.return_f0 is true:
+                    - t:  frame time stamps
+                    - f0: predicted pitches
+                    - confidence: pitch prediction confidences
+
+                If self.return_f0 is false:
+                    - f:  frequencies of classifier bins
+                    - t:  frame time stamps
+                    - P:  classifier output
+        
         """
 
         if fs != self.fs:

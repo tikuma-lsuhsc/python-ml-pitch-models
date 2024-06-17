@@ -21,7 +21,7 @@ PretrainedModelName = Literal[
     "fcn_1953",
     "fcn_929",
     "fcn_993",
-]  # pretrained pitch detector models
+]  # names of pretrained pitch detector models
 
 
 @cache
@@ -278,68 +278,71 @@ def predict(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Generates pitch predictions for the input signal.
 
-    Computation is done in batches. This method is designed for batch
-    processing of large numbers of inputs. It is not intended for use inside
-    of loops that iterate over your data and process small numbers of inputs
-    at a time.
-
-    For small numbers of inputs that fit in one batch,
-    directly use `__call__()` for faster execution, e.g.,
-    `model(x)`, or `model(x, training=False)` if you have layers such as
-    `BatchNormalization` that behave differently during
-    inference.
-
     Args:
-        x: NumPy array (or array-like). Input signal(s). For a higher
-            dimensional array, the pitch is detected along the last
+        x: Input signal(s). For a higher dimensional array, the pitch is detected along the last
             dimension.
-        fs: Integer. Input signal sampling rate in Samples/second. This must
+
+        fs: Input signal sampling rate in Samples/second. This must
             match model.fs.
-        hop: Integer. The increment in signal samples, by which the window
+
+        model: Pitch detection deep-learning model.
+
+        framewise: True to perform per-frame operation. If not given, CREPE models set this True
+            while FCN-F0 models set False.
+
+        voice_threshold: Voice detection threshold on the classifier confidence level. If unvoiced
+            is detected, f0=0 is returned and its confidence level indicates the confidence of
+            detecting unvoiced (i.e., 1 - (classifier confidence)).
+
+        hop: The increment in signal samples, by which the window
             is shifted in each step for frame-wise processing. If None, hop
             size of (roughly) 10 ms is used. For stream processing, this argument
             is ignored and the native hop size (self.native_hop) of the model
             is used instead.
-        p0: Integer. The first element of the range of slices to calculate.
+
+        p0: The first element of the range of slices to calculate.
             If None then it is set to p_min, which is the smallest possible
             slice.
-        p1: Integer or None. The end of the array. If None then the largest
+
+        p1: The end of the array. If None then the largest
             possible slice is used.
-        k_offset: Integer. Index of first sample (t = 0) in x.
-        padding: PAD_TYPE. Kind of values which are added, when the sliding window sticks out on
+
+        k_offset: Index of first sample (t = 0) in x.
+
+        padding: Kind of values which are added, when the sliding window sticks out on
             either the lower or upper end of the input x. Zeros are added if the default ‘zeros’
             is set. For ‘edge’ either the first or the last value of x is used. ‘even’ pads by
             reflecting the signal on the first or last sample and ‘odd’ additionally multiplies
             it with -1.
-        batch_size: Integer or `None`.
-            Number of samples per batch.
+
+        batch_size: Number of samples per batch.
             If unspecified, `batch_size` will default to 32.
             Do not specify the `batch_size` if your data is in the
             form of dataset, generators, or `keras.utils.PyDataset`
             instances (since they generate batches).
+
         verbose: `"auto"`, 0, 1, or 2. Verbosity mode.
             0 = silent, 1 = progress bar, 2 = single line.
             `"auto"` becomes 1 for most cases. Note that the progress bar
             is not particularly useful when logged to a file,
             so `verbose=2` is recommended when not running interactively
             (e.g. in a production environment). Defaults to `"auto"`.
+
         steps: Total number of steps (batches of samples)
             before declaring the prediction round finished.
             Ignored with the default value of `None`.
             If `x` is a `tf.data.Dataset` and `steps` is `None`,
             `predict()` will run until the input dataset is exhausted.
+
         callbacks: List of `keras.callbacks.Callback` instances.
             List of callbacks to apply during prediction.
 
     Returns:
-        If self.return_f0 is true:
-            t:  NumPy array of frame time stamps
-            f0: NumPy array(s) of pitch predictions
-            confidence: NumPy array of pitch prediction confidence
-        If self.return_f0 is false:
-            f:  NumPy array of frequencies of classifier bins
-            t:  NumPy array of frame time stamps
-            P:  NumPy array(s) of classifier output
+        tuple[np.ndarray, np.ndarray, np.ndarray]:
+            - t:  frame time stamps
+            - f0: predicted pitches
+            - confidence: pitch prediction confidences
+
     """
     if isinstance(model, str):
         try:
