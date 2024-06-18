@@ -2,3 +2,4 @@ jupyter
 matplotlib
 praat-parselmouth
 librosa
+ipympl
