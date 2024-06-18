@@ -199,9 +199,9 @@ class FCN1953Model(FcnF0Model):
     """
 
     cnn_config = (
-        {"filters": 256, "kernel_size": 32, "maxpool": 2},
-        {"filters": 32, "kernel_size": 64, "maxpool": 2},
-        {"filters": 32, "kernel_size": 64, "maxpool": 2},
+        {"filters": 256, "kernel_size": 32, "maxpool_size": 2},
+        {"filters": 32, "kernel_size": 64, "maxpool_size": 2},
+        {"filters": 32, "kernel_size": 64, "maxpool_size": 2},
         {"filters": 128, "kernel_size": 64},
         {"filters": 256, "kernel_size": 64},
         {"filters": 512, "kernel_size": 64},
@@ -226,9 +226,9 @@ class FCN993Model(FcnF0Model):
     """
 
     cnn_config = (
-        {"filters": 256, "kernel_size": 32, "maxpool": 2},
-        {"filters": 32, "kernel_size": 32, "maxpool": 2},
-        {"filters": 32, "kernel_size": 32, "maxpool": 2},
+        {"filters": 256, "kernel_size": 32, "maxpool_size": 2},
+        {"filters": 32, "kernel_size": 32, "maxpool_size": 2},
+        {"filters": 32, "kernel_size": 32, "maxpool_size": 2},
         {"filters": 128, "kernel_size": 32},
         {"filters": 256, "kernel_size": 32},
         {"filters": 512, "kernel_size": 32},
@@ -253,8 +253,8 @@ class FCN929Model(FcnF0Model):
     """
 
     cnn_config = (
-        {"filters": 256, "kernel_size": 32, "maxpool": 2},
-        {"filters": 32, "kernel_size": 64, "maxpool": 2},
+        {"filters": 256, "kernel_size": 32, "maxpool_size": 2},
+        {"filters": 32, "kernel_size": 64, "maxpool_size": 2},
         {"filters": 128, "kernel_size": 64},
         {"filters": 256, "kernel_size": 64},
         {"filters": 512, "kernel_size": 64},
