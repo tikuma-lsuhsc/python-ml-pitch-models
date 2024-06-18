@@ -64,7 +64,7 @@ def available_models() -> list[str]:
         path.join("*", "weights.h5"),
         root_dir=root_dir,
     )
-    return [path.dirname(f) for f in files]
+    return sorted(path.dirname(f) for f in files)
 
 
 crepe_base_cnn_config = (
