@@ -268,6 +268,24 @@ class FCN929Model(FcnF0Model):
         self.weights_file = weights_file
 
 
+def load_model(model, **kwargs):
+    try:
+        return {
+            "crepe_full": CrepeFullModel,
+            "crepe_large": CrepeLargeModel,
+            "crepe_medium": CrepeMediumModel,
+            "crepe_small": CrepeSmallModel,
+            "crepe_tiny": CrepeTinyModel,
+            "fcn_1953": FCN1953Model,
+            "fcn_929": FCN929Model,
+            "fcn_993": FCN993Model,
+        }[model](**kwargs)
+    except IndexError:
+        raise ValueError("Invalid model name")
+    except ValueError:
+        raise ValueError("CREPE model must use framewise=True")
+
+
 def predict(
     x: ArrayLike,
     fs: int,
@@ -345,23 +363,9 @@ def predict(
 
     """
     if isinstance(model, str):
-        try:
-            model = {
-                "crepe_full": CrepeFullModel,
-                "crepe_large": CrepeLargeModel,
-                "crepe_medium": CrepeMediumModel,
-                "crepe_small": CrepeSmallModel,
-                "crepe_tiny": CrepeTinyModel,
-                "fcn_1953": FCN1953Model,
-                "fcn_929": FCN929Model,
-                "fcn_993": FCN993Model,
-            }[model](
-                framewise=framewise, return_f0=True, voice_threshold=voice_threshold
-            )
-        except IndexError:
-            raise ValueError("Invalid model name")
-        except ValueError:
-            raise ValueError("CREPE model must use framewise=True")
+        model = load_model(
+            model, framewise=framewise, return_f0=True, voice_threshold=voice_threshold
+        )
     elif not isinstance(model, (CrepeFullModel, FcnF0Model)):
         raise ValueError(
             "model must be a valid pretained model name or a CREPE or FCN-F0 model instances."
