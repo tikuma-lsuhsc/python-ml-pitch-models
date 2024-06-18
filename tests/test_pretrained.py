@@ -1,24 +1,57 @@
-from scipy.io import wavfile
+import ffmpegio as ff
 import numpy as np
 
+from scipy.signal import ShortTimeFFT, get_window
 from matplotlib import pyplot as plt
 
-from ml_pitch_models.pretrained import *
 
-print(available_models())
+audiofile = "examples/the_north_wind_and_the_sun.wav"
+data = {
+    fs: x[:, 0]
+    for fs, x in (
+        ff.audio.read(audiofile, ac=1, ar=fs, sample_fmt="flt") for fs in (8000, 16000)
+    )
+}
 
-# fs, x = wavfile.read("tests/test_crepe.wav")
-fs, x = wavfile.read("tests/test.wav")
-# x = x[10000:20000]
-x = x[: len(x) // 2]
+fs = 8000
+x = data[fs]
 
-t, f0, conf = predict(x, fs, voice_threshold=0.5,framewise=True)
+nb_samples = len(x)
+t = np.arange(nb_samples) / fs
 
-plt.subplots(3, 1, sharex=True)
-plt.subplot(3, 1, 1)
-plt.plot(np.arange(len(x)) / fs, x)
-plt.subplot(3, 1, 2)
-plt.plot(t, f0, ".-")
-plt.subplot(3, 1, 3)
-plt.plot(t, conf, ".-")
+
+nperseg = int(0.05 * fs)
+SFT = ShortTimeFFT(win=get_window("hamming", nperseg), hop=nperseg // 2, fs=fs)
+Sxx_dB = 10 * np.log10(SFT.spectrogram(x))
+
+import ml_pitch_models as mlf0
+
+models = {
+    model: mlf0.load_model(model, return_f0=True, framewise=True)
+    for model in mlf0.available_models()
+}
+
+results = {
+    name: model.predict(data[model.fs], model.fs) for name, model in models.items()
+}
+
+for model, res in results.items():
+    plt.plot(*res[:2], ".-", label=model)
+    plt.legend()
 plt.show()
+
+# print(results)
+
+# plt.subplots(2, 1, sharex=True)
+# plt.subplot(2, 1, 1)
+# plt.imshow(Sxx_dB, extent=SFT.extent(nb_samples), aspect="auto", origin="lower")
+# for model, res in results.items():
+#     plt.plot(*res[:-2], ".-w", label=model)
+# plt.ylabel("frequency (Hz)")
+# plt.ylim([0, 1000])
+# plt.legend()
+# plt.subplot(2, 1, 2)
+# for model, res in results.items():
+#     plt.plot(*res[:-2], ".-w", label=model)
+# plt.ylabel("confidence")
+# plt.xlabel("time (s)")
