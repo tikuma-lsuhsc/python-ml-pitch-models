@@ -14,7 +14,7 @@ from numbers import Number
 
 from warnings import warn
 
-from tensorflow.keras import saving
+from tensorflow.keras import saving, Model
 from tensorflow.keras.layers import (
     Layer,
     InputLayer,
@@ -28,13 +28,8 @@ from tensorflow.keras.layers import (
     Dense,
 )
 
-from .utils import PAD_TYPE, freq2cents, prepare_frames, prepare_signal, cents2freq
+from .utils import PAD_TYPE, freq2cents
 from .stap import ShortTimeProcess, ShortTimeStreamProcess
-
-from tensorflow.keras import Model
-from tensorflow.keras.layers import Layer, Reshape
-
-
 from .layers import ToHertzLayer
 
 
