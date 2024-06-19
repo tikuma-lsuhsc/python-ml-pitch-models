@@ -4,16 +4,15 @@ from matplotlib import pyplot as plt
 import ffmpegio as ff
 
 fs, x = ff.audio.read(
-    "examples/the_north_wind_and_the_sun.wav", ar=8000, ac=1, sample_fmt="flt"
+    "examples/the_north_wind_and_the_sun.wav", ar=16000, ac=1, sample_fmt="flt"
 )
 x = x[:, 0]
 
-# hop = "native"
 hop = None
 
-Model = models.FCN929Model
+Model = models.CrepeSmallModel
 
-model = Model(return_f0=True, hop=hop)
+model = Model(return_f0=True)
 
 t = model.t(len(x))
 

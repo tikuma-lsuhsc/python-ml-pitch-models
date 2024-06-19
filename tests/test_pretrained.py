@@ -27,12 +27,12 @@ Sxx_dB = 10 * np.log10(SFT.spectrogram(x))
 import ml_pitch_models as mlf0
 
 models = {
-    model: mlf0.load_model(model, return_f0=True, framewise=True)
-    for model in mlf0.available_models()
+    model: mlf0.load_model(model, return_f0=True) for model in mlf0.available_models()
 }
 
 results = {
-    name: model.predict(data[model.fs], model.fs) for name, model in models.items()
+    name: (model.t(len(data[model.fs])), *model.predict(data[model.fs], model.fs))
+    for name, model in models.items()
 }
 
 for model, res in results.items():

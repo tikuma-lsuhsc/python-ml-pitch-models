@@ -3,17 +3,18 @@ from __future__ import annotations
 import sys
 
 if sys.version_info < (3, 11):
-    from typing_extensions import TypedDict, Required, NotRequired
+    from typing_extensions import TypedDict, Required, NotRequired, Literal
 else:
-    from typing import TypedDict, Required, NotRequired
+    from typing import TypedDict, Required, NotRequired, Literal
 
-
+from functools import cached_property
 import numpy as np
 from numpy.typing import ArrayLike
+from numbers import Number
 
 from warnings import warn
 
-from tensorflow.keras import Model, saving
+from tensorflow.keras import saving
 from tensorflow.keras.layers import (
     Layer,
     InputLayer,
@@ -27,8 +28,14 @@ from tensorflow.keras.layers import (
     Dense,
 )
 
-from .layers import ToHertzLayer
 from .utils import PAD_TYPE, freq2cents, prepare_frames, prepare_signal, cents2freq
+from .stap import ShortTimeProcess, ShortTimeStreamProcess
+
+from tensorflow.keras import Model
+from tensorflow.keras.layers import Layer, Reshape
+
+
+from .layers import ToHertzLayer
 
 
 class LayerInfo(TypedDict):
@@ -47,68 +54,107 @@ class LayerInfo(TypedDict):
     maxpool_size: NotRequired[int]
 
 
+class BaseMLPitchModel(Model):
+
+    _voice_threshold: float = 0.5
+    _tohz_nb_average: int = 9
+
+    def __init__(self, voice_threshold: float | None):
+
+        super().__init__()
+
+        if voice_threshold is not None:
+            if not (isinstance(voice_threshold, Number) and voice_threshold >= 0):
+                raise ValueError(f"{voice_threshold=} must be a nonnegative number")
+            self._voice_threshold = voice_threshold
+
+    @property
+    def voice_threshold(self) -> float:
+        """Voice detection threshold"""
+        return self._voice_threshold
+
+    @property
+    def tohz_nb_average(self) -> float:
+        """Number of samples calculate the weighted-average estimate of the pitch"""
+        return self._tohz_nb_average
+
+    def _create_to_pitch_layers(self, name: str = "to-hertz") -> Layer:
+        return ToHertzLayer(
+            fbins=self.f,
+            threshold=self.voice_threshold,
+            nb_average=self.tohz_nb_average,
+            name=name,
+        )
+
+
 @saving.register_keras_serializable()
-class CrepeModel(Model):
+class CrepeModel(BaseMLPitchModel, ShortTimeProcess):
     """CREPE pitch estimation model
 
     Args:
-        *layers (sequence of LayerInfo): Variable length argument list to define
-            CNN layers.
+        *layers
+            Variable length argument list to define CNN layers.
 
-        weights_file (str, optional): path to the weights file to load. It can
+        weights_file
+            path to the weights file to load. It can
             either be a .weights.h5 file or a legacy .h5 weights file. Defaults
             to None.
 
-        nb_input (int | None, optional): input frame size. Defaults to None to
-            use the class default (1024).
+        hop
+            The increment in signal samples, by which the window
+            is shifted in each step for frame-wise processing. If None, hop
+            size of (roughly) 10 ms is used
 
-        nb_freq_bins (int | None, optional): classifier output size. Defaults to
-            None to use the class default (360).
-
-        return_f0 (bool, optional): True to return pitch estimates in Hz.
+        return_f0
+            True to return pitch estimates in Hz.
             Defaults to False to return classifier output.
 
-        framewise (bool | None, optional): True to transform the input to a
+        framewise
+            True to transform the input to a
             sequence of sliding window frames. This option must be True or None
             for CrepeModel. Defaults to True.
 
-        voice_threshold (float | None, optional): Classifier output threshold to
+        voice_threshold
+            Classifier output threshold to
             detect voice. Defaults to None (uses the class default of 0.5.).
 
-        dropout (float, optional): dropout rate (training only). Defaults to 0.25.
+        dropout
+            Dropout rate (training only). Defaults to 0.25.
+
+    Subclassing CrepeModel
+    ----------------------
+
+        nb_input
+            input frame size. Defaults to None to
+            use the class default (1024).
+
+        nb_freq_bins
+            classifier output size. Defaults to None to use the class default (360).
+
     """
 
     fs: int = 16000  # input sampling rate
     nb_input: int = 1024  #
     nb_freq_bins: int = 360  # number of frequency bins
-    cmin: float = 1997.3794084376191  # minimum frequency bin in cents
-    cmax: float = 7180 + 1997.3794084376191  # minimum frequency bin in cents
-    fref: float = 10.0  # reference frequency for cents conversion
-    tohz_nb_average: int = 9
-    voice_threshold: float = 0.5
+    f_scale: str = "log"
+    f_min: float = freq2cents(31.7)  # minimum frequency bin in cents
+    delta_f: float = 20.0
+    # cmax: float = 7180 + 1997.3794084376191  # minimum frequency bin in cents
 
     def __init__(
         self,
         *layers: tuple[LayerInfo],
         weights_file: str | None = None,
-        nb_input: int | None = None,
-        nb_freq_bins: int | None = None,
+        hop: int | None = None,
         return_f0: bool = False,
-        framewise: bool | None = True,
         voice_threshold: float | None = None,
         dropout: float = 0.25,
     ):
-        if framewise is False:
-            raise ValueError("CrepeModel only support framewise=True.")
+        if hop is None:
+            hop = int(10e-3 * CrepeModel.fs)
 
-        super().__init__()
-
-        if nb_input is not None:
-            self.nb_input = nb_input
-        if nb_freq_bins is not None:
-            self.nb_freq_bins = nb_freq_bins
-        if voice_threshold is not None:
-            self.voice_threshold = voice_threshold
+        BaseMLPitchModel.__init__(self, voice_threshold)
+        ShortTimeProcess.__init__(self, hop)
 
         self.input_layers = [
             InputLayer(shape=(self.nb_input,), name="input", dtype="float32"),
@@ -148,21 +194,10 @@ class CrepeModel(Model):
             self.output_layers.extend(
                 [
                     Reshape(
-                        target_shape=(1, self.nb_freq_bins),
-                        name="to-hertz-reshape",
+                        target_shape=(1, self.nb_freq_bins), name="to-hertz-reshape"
                     ),
-                    ToHertzLayer(
-                        threshold=self.voice_threshold,
-                        cmin=self.cmin,
-                        cmax=self.cmax,
-                        fref=self.fref,
-                        nb_average=self.tohz_nb_average,
-                        name="to-hertz",
-                    ),
-                    Reshape(
-                        target_shape=(2,),
-                        name="output-reshape",
-                    ),
+                    self._create_to_pitch_layers("to-hertz"),
+                    Reshape(target_shape=(2,), name="output-reshape"),
                 ]
             )
 
@@ -170,13 +205,6 @@ class CrepeModel(Model):
 
         if weights_file is not None:  # if restarting learning from a checkpoint
             self.load_weights(weights_file, by_name=True)
-
-    @property
-    def bin_frequencies(self) -> np.ndarray:
-        """np.ndarray: frequencies of the classifier output bins"""
-        return cents2freq(
-            np.linspace(self.cmin, self.cmax, self.nb_freq_bins), self.fref
-        )
 
     @property
     def layers(self) -> list[Layer]:
@@ -218,13 +246,13 @@ class CrepeModel(Model):
         self,
         x: ArrayLike,
         fs: int,
-        hop: int | None = None,
         p0: int = 0,
         p1: int | None = None,
         k_offset: int = 0,
         padding: PAD_TYPE = "zeros",
+        axis: int = -1,
         **kwargs,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray] | np.ndarray:
         """Generates pitch predictions for the input signal.
 
         Computation is done in batches. This method is designed for batch
@@ -239,47 +267,55 @@ class CrepeModel(Model):
         inference.
 
         Args:
-            x: NumPy array (or array-like). Input signal(s). For a higher
+            x
+                Input signal(s). For a higher
                 dimensional array, the pitch is detected along the last
                 dimension.
 
-            fs: Integer. Input signal sampling rate in Samples/second. This must
+            fs
+                Input signal sampling rate in Samples/second. This must
                 match model.fs.
 
-            hop: Integer. The increment in signal samples, by which the window
-                is shifted in each step for frame-wise processing. If None, hop
-                size of (roughly) 10 ms is used
-
-            p0: Integer. The first element of the range of slices to calculate.
+            p0
+                The first element of the range of slices to calculate.
                 If None then it is set to p_min, which is the smallest possible
                 slice.
 
-            p1: Integer or None. The end of the array. If None then the largest
+            p1
+                The end of the array. If None then the largest
                 possible slice is used.
 
-            k_offset: Integer. Index of first sample (t = 0) in x.
+            k_offset
+                Index of first sample (t = 0) in x.
 
-            padding: PAD_TYPE. Kind of values which are added, when the sliding window sticks out on
+            padding
+                Kind of values which are added, when the sliding window sticks out on
                 either the lower or upper end of the input x. Zeros are added if the default ‘zeros’
                 is set. For ‘edge’ either the first or the last value of x is used. ‘even’ pads by
                 reflecting the signal on the first or last sample and ‘odd’ additionally multiplies
                 it with -1.
 
-            batch_size: Integer or `None`.
+            axis
+                The axis of `x` over which to run the model along.
+                If not given, the last axis is used.
+
+            batch_size
                 Number of samples per batch.
                 If unspecified, `batch_size` will default to 32.
                 Do not specify the `batch_size` if your data is in the
                 form of dataset, generators, or `keras.utils.PyDataset`
                 instances (since they generate batches).
 
-            verbose: `"auto"`, 0, 1, or 2. Verbosity mode.
+            verbose
+                `"auto"`, 0, 1, or 2. Verbosity mode.
                 0 = silent, 1 = progress bar, 2 = single line.
                 `"auto"` becomes 1 for most cases. Note that the progress bar
                 is not particularly useful when logged to a file,
                 so `verbose=2` is recommended when not running interactively
                 (e.g. in a production environment). Defaults to `"auto"`.
 
-            steps: Total number of steps (batches of samples)
+            steps
+                Total number of steps (batches of samples)
                 before declaring the prediction round finished.
                 Ignored with the default value of `None`.
                 If `x` is a `tf.data.Dataset` and `steps` is `None`,
@@ -289,16 +325,12 @@ class CrepeModel(Model):
                 List of callbacks to apply during prediction.
 
         Returns:
-            tuple[np.ndarray, np.ndarray, np.ndarray]:
-                If self.return_f0 is true:
-                    - t:  frame time stamps
-                    - f0: predicted pitches
-                    - confidence: pitch prediction confidences
+            If self.return_f0 is true:
+                - f0: predicted pitches
+                - confidence: pitch prediction confidences
 
-                If self.return_f0 is false:
-                    - f:  frequencies of classifier bins
-                    - t:  frame time stamps
-                    - P:  classifier output
+            If self.return_f0 is false:
+                - 2D array of a sequence of confidence levels of all frequency bins
         """
 
         if fs != self.fs:
@@ -306,16 +338,11 @@ class CrepeModel(Model):
                 f"fs({fs}) does not match the model sampling rate ({self.fs}). Resample x first."
             )
 
-        m_num = self.nb_input
-
-        if hop is None or hop <= 0:
-            hop = int(10e-3 * fs)
-
-        frames = prepare_frames(x, m_num, hop, p0, p1, k_offset, padding)
+        frames = self.prepare_frames(x, p0, p1, k_offset, padding, axis)
         inndim = frames.ndim
         inshape = frames.shape
         if inndim > 2:
-            frames = frames.reshape(-1, m_num)
+            frames = frames.reshape(-1, self.nb_input)
 
         out = super().predict(frames, **kwargs)
         # keywards: batch_size=None, verbose='auto', steps=None, callbacks=None
@@ -323,81 +350,74 @@ class CrepeModel(Model):
         if inndim > 1:
             out = out.reshape(*inshape[:-1], -1)
 
-        t = (np.arange(-k_offset, out.shape[-2] - k_offset)) * (hop / fs)
-
-        return (
-            (t, *np.moveaxis(out, -1, 0))
-            if self.return_f0
-            else (self.bin_frequencies, t, out)
-        )
+        return (*np.moveaxis(out, -1, 0),) if self.return_f0 else out
 
 
 ###################################
 
 
 @saving.register_keras_serializable()
-class FcnF0Model(Model):
+class FcnF0Model(BaseMLPitchModel, ShortTimeStreamProcess):
 
     fs: int = 8000  # input sampling rate
     nb_freq_bins: int = 486  # number of frequency bins
+    f_scale: str = "log"
+    f_min: float = freq2cents(30.0)  # minimum frequency bin in Hz
+    delta_f: float = freq2cents(1000 / 30) / 485  # frequency spacing in cents
+
     classifier_kernel_size: int = 4
-    cmin: float = freq2cents(30.0)  # minimum frequency bin in cents
-    cmax: float = freq2cents(1000.0)  # minimum frequency bin in cents
-    fref: float = 10.0  # reference frequency for cents conversion
-    tohz_nb_average: int = 9
-    voice_threshold: float = 0.5  #
+
+    _nb_input: int
+
     """FCN-F0 pitch estimation model
 
     Args:
-        *layers (sequence of LayerInfo): Variable length argument list to define
+        *layers (a sequence of LayerInfo): Variable length argument list to define
             CNN layers.
 
-        weights_file (str, optional): path to the weights file to load. It can
+        weights_file: path to the weights file to load. It can
             either be a .weights.h5 file or a legacy .h5 weights file. Defaults
             to None.
 
-        nb_freq_bins (int | None, optional): classifier output size. Defaults to
-            None to use the class default (360).
+        hop
+            The increment in signal samples, by which the window
+            is shifted in each step for frame-wise processing. If None or 0, the 
+            model operates in fully convolutional (single-batch) mode with its 
+            hop size set to the `native_hop`.
 
-        return_f0 (bool, optional): True to return pitch estimates in Hz.
+        return_f0: True to return pitch estimates in Hz.
             Defaults to False to return classifier output.
 
-        framewise (bool | None, optional): True to transform the input to a
-            sequence of sliding window frames. This option must be True or None
-            for CrepeModel. Defaults to False.
-
-        voice_threshold (float | None, optional): Classifier output threshold to
+        voice_threshold
+            Classifier output threshold to
             detect voice. Defaults to None (uses the class default of 0.5.).
 
-        dropout (float, optional): dropout rate (training only). Defaults to 0.25.
+        dropout
+            Dropout rate (training only). Defaults to 0.25.
     """
 
     def __init__(
         self,
         *layers: tuple[LayerInfo],
-        framewise: bool | None = False,
-        weights_file=None,
-        nb_freq_bins: int | None = None,
-        classifier_kernel_size: int | None = None,
+        weights_file: str | None = None,
+        hop: int | None | Literal["native"] = "native",
         return_f0: bool = False,
         voice_threshold: float | None = None,
         dropout: float = 0.25,
     ):
-        super().__init__()
+        if hop is None or hop == "native":
+            hop = 0
 
-        if nb_freq_bins is not None:
-            self.nb_freq_bins = nb_freq_bins
-        if classifier_kernel_size is not None:
-            self.classifier_kernel_size = classifier_kernel_size
-        if voice_threshold is not None:
-            self.voice_threshold = voice_threshold
+        BaseMLPitchModel.__init__(self, voice_threshold)
+        ShortTimeStreamProcess.__init__(self, hop)
+
+        framewise = bool(self._hop)
 
         nb_input = self.classifier_kernel_size
         for d in reversed(layers):
             maxpool_size_size = d.get("maxpool_size", 1)
             nb_input = maxpool_size_size * nb_input + d["kernel_size"] - 1
-        self.nb_input = nb_input
-        self.framewise = bool(framewise)
+        self._nb_input = nb_input
 
         self.input_layers = (
             [
@@ -450,16 +470,7 @@ class FcnF0Model(Model):
 
         self.return_f0 = return_f0
         if return_f0:
-            self.output_layers.append(
-                ToHertzLayer(
-                    threshold=self.voice_threshold,
-                    cmin=self.cmin,
-                    cmax=self.cmax,
-                    fref=self.fref,
-                    nb_average=self.tohz_nb_average,
-                    name="to-hertz",
-                )
-            )
+            self.output_layers.append(self._create_to_pitch_layers("to-hertz"))
 
         if framewise:
             self.output_layers.append(
@@ -475,6 +486,16 @@ class FcnF0Model(Model):
             self.load_weights(weights_file, by_name=True)
 
     @property
+    def nb_input(self) -> int:
+        """Number of inputs to the model (readonly)"""
+        return self._nb_input
+
+    @cached_property
+    def native_hop(self) -> int:
+        """hop size when streaming (readonly)"""
+        return np.prod([l.get_config().get("strides", [1])[0] for l in self.layers])
+
+    @property
     def layers(self) -> list[Layer]:
         """list[Layer]: All the model layers in the execution order"""
         return list(
@@ -483,18 +504,6 @@ class FcnF0Model(Model):
                 *(l for ls in self.cnn_layers for l in ls if l is not None),
                 *self.output_layers,
             ]
-        )
-
-    @property
-    def native_hop(self) -> int:
-        """int: hop size when operating non-framewise."""
-        return np.prod([l.get_config().get("strides", [1])[0] for l in self.layers])
-
-    @property
-    def bin_frequencies(self) -> np.ndarray:
-        """np.ndarray: frequencies of the classifier output bins"""
-        return cents2freq(
-            np.linspace(self.cmin, self.cmax, self.nb_freq_bins), self.fref
         )
 
     def call(self, inputs, training=False):
@@ -533,13 +542,13 @@ class FcnF0Model(Model):
         self,
         x: ArrayLike,
         fs: int,
-        hop: int | None = None,
-        p0: int = 0,
+        p0: int | None = None,
         p1: int | None = None,
         k_offset: int = 0,
         padding: PAD_TYPE = "zeros",
+        axis: int = -1,
         **kwargs,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ) -> tuple[np.ndarray, np.ndarray] | np.ndarray:
         """Generates pitch predictions for the input signal.
 
         Computation is done in batches. This method is designed for batch
@@ -554,69 +563,72 @@ class FcnF0Model(Model):
         inference.
 
         Args:
-            x: NumPy array (or array-like). Input signal(s). For a higher
+            x
+                Input signal(s). For a higher
                 dimensional array, the pitch is detected along the last
                 dimension.
 
-            fs: Integer. Input signal sampling rate in Samples/second. This must
+            fs
+                Input signal sampling rate in Samples/second. This must
                 match model.fs.
 
-            hop: Integer. The increment in signal samples, by which the window
-                is shifted in each step for frame-wise processing. If None, hop
-                size of (roughly) 10 ms is used. For stream processing, this argument
-                is ignored and the native hop size (self.native_hop) of the model
-                is used instead.
-
-            p0: Integer. The first element of the range of slices to calculate.
+            p0
+                The first element of the range of slices to calculate.
                 If None then it is set to p_min, which is the smallest possible
                 slice.
 
-            p1: Integer or None. The end of the array. If None then the largest
+            p1
+                The end of the array. If None then the largest
                 possible slice is used.
 
-            k_offset: Integer. Index of first sample (t = 0) in x.
+            k_offset
+                Index of first sample (t = 0) in x.
 
-            padding: PAD_TYPE. Kind of values which are added, when the sliding window sticks out on
+            padding
+                Kind of values which are added, when the sliding window sticks out on
                 either the lower or upper end of the input x. Zeros are added if the default ‘zeros’
                 is set. For ‘edge’ either the first or the last value of x is used. ‘even’ pads by
                 reflecting the signal on the first or last sample and ‘odd’ additionally multiplies
                 it with -1.
 
-            batch_size: Integer or `None`.
+            axis
+                The axis of `x` over which to run the model along.
+                If not given, the last axis is used.
+
+            batch_size
                 Number of samples per batch.
                 If unspecified, `batch_size` will default to 32.
                 Do not specify the `batch_size` if your data is in the
                 form of dataset, generators, or `keras.utils.PyDataset`
                 instances (since they generate batches).
 
-            verbose: `"auto"`, 0, 1, or 2. Verbosity mode.
+            verbose
+                `"auto"`, 0, 1, or 2. Verbosity mode.
                 0 = silent, 1 = progress bar, 2 = single line.
                 `"auto"` becomes 1 for most cases. Note that the progress bar
                 is not particularly useful when logged to a file,
                 so `verbose=2` is recommended when not running interactively
                 (e.g. in a production environment). Defaults to `"auto"`.
 
-            steps: Total number of steps (batches of samples)
+            steps
+                Total number of steps (batches of samples)
                 before declaring the prediction round finished.
                 Ignored with the default value of `None`.
                 If `x` is a `tf.data.Dataset` and `steps` is `None`,
                 `predict()` will run until the input dataset is exhausted.
 
-            callbacks: List of `keras.callbacks.Callback` instances.
+            callbacks
+                List of `keras.callbacks.Callback` instances.
                 List of callbacks to apply during prediction.
 
         Returns:
-            tuple[np.ndarray, np.ndarray, np.ndarray]:
-                If self.return_f0 is true:
-                    - t:  frame time stamps
-                    - f0: predicted pitches
-                    - confidence: pitch prediction confidences
+            If self.return_f0 is true:
+                - f0: predicted pitches
+                - confidence: pitch prediction confidences
 
-                If self.return_f0 is false:
-                    - f:  frequencies of classifier bins
-                    - t:  frame time stamps
-                    - P:  classifier output
-        
+            If self.return_f0 is false:
+                - 2D array of a sequence of confidence levels of all frequency bins
+
         """
 
         if fs != self.fs:
@@ -626,24 +638,14 @@ class FcnF0Model(Model):
 
         m_num = self.nb_input
 
-        if self.framewise:
-            if hop is None or hop <= 0:
-                hop = int(10e-3 * fs)
-
-            frames = prepare_frames(x, m_num, hop, p0, p1, k_offset, padding)
-            inndim = frames.ndim
-            inshape = frames.shape
+        frames = self.prepare_frames(x, p0, p1, k_offset, padding, axis)
+        inndim = frames.ndim
+        inshape = frames.shape
+        framewise = bool(self._hop)
+        if framewise:  # batch operation
             if inndim > 2:
                 frames = frames.reshape(-1, m_num)
         else:  # fully convolutional (frames determined by the model structure)
-            if hop is not None and hop > 0:
-                warn(
-                    "For fully convolutional operation, model's native hop size is used, and hop argument is ignored."
-                )
-            hop = self.native_hop
-            frames = prepare_signal(x, m_num, hop, p0, p1, k_offset, padding)
-            inndim = frames.ndim
-            inshape = frames.shape
             if inndim == 1:
                 frames = frames.reshape(1, -1)
             elif inndim > 2:
@@ -652,7 +654,7 @@ class FcnF0Model(Model):
         out = super().predict(frames, **kwargs)
         # keywards: batch_size=None, verbose='auto', steps=None, callbacks=None
 
-        if self.framewise:
+        if framewise:
             if inndim > 1:
                 out = out.reshape(*inshape[:-1], -1)
         else:
@@ -661,10 +663,4 @@ class FcnF0Model(Model):
             elif inndim > 2:
                 out = out.reshape(*inshape[:-1], *out.shape[-2:])
 
-        t = (np.arange(-k_offset, out.shape[-2] - k_offset)) * (hop / fs)
-
-        return (
-            (t, *np.moveaxis(out, -1, 0))
-            if self.return_f0
-            else (self.bin_frequencies, t, out)
-        )
+        return (*np.moveaxis(out, -1, 0),) if self.return_f0 else out

@@ -7,12 +7,12 @@ from numpy.typing import ArrayLike
 from numpy.lib.stride_tricks import sliding_window_view
 
 
-def freq2cents(f0: ArrayLike, f_ref: float = 10.0) -> ArrayLike:
+def freq2cents(f0: ArrayLike, f_ref: float = 1.0) -> ArrayLike:
     """Convert a given frequency into its corresponding cents value, according to given reference frequency f_ref
 
     Args:
         f0 (ArrayLike): f0 value (in Hz)
-        f_ref (float, optional): reference frequency in Hz. Defaults to 10.0 Hz.
+        f_ref (float, optional): reference frequency in Hz. Defaults to 1.0 Hz.
 
     Returns:
         ArrayLike: frequency in cents
@@ -22,12 +22,12 @@ def freq2cents(f0: ArrayLike, f_ref: float = 10.0) -> ArrayLike:
     return c
 
 
-def cents2freq(cents: ArrayLike, f_ref: float = 10.0) -> ArrayLike:
+def cents2freq(cents: ArrayLike, f_ref: float = 1.0) -> ArrayLike:
     """conversion from cents value to f0 in Hz
 
     Args:
         cents (ArrayLike): pitch frequency in cents
-        f_ref (float, optional): reference frequency in Hz. Defaults to 10.0 Hz.
+        f_ref (float, optional): reference frequency in Hz. Defaults to 1.0 Hz.
 
     Returns:
         ArrayLike: frequency in Hz

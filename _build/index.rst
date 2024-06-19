@@ -181,7 +181,7 @@ API Reference
 Literal['crepe_full', 'crepe_large', 'crepe_medium', 'crepe_small',
 'crepe_tiny', 'fcn_1953', 'fcn_929', 'fcn_993'] | FcnF0Model |
 CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
-= 0.5, **kwargs)**
+= 0.5, axis: int = -1, **kwargs)**
 
    Generates pitch predictions for the input signal.
 
@@ -249,12 +249,11 @@ CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
          List of callbacks to apply during prediction.
 
    :Returns:
-      *  f0: predicted pitches
-
-      *  confidence: pitch prediction confidences
+      timestamps - f0: predicted pitches - confidence: pitch
+      prediction confidences
 
    :Return type:
-      tuple[np.ndarray, np.ndarray]
+      *  t
 
 **class ml_pitch_models.CrepeModel(*args, **kwargs)**
 
@@ -298,7 +297,8 @@ CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
 
    **predict(x: ArrayLike, fs: int, p0: int = 0, p1: int | None =
    None, k_offset: int = 0, padding: Literal['zeros', 'edge', 'even',
-   'odd'] = 'zeros', **kwargs) -> tuple[ndarray, ndarray] | ndarray**
+   'odd'] = 'zeros', axis: int = -1, **kwargs) -> tuple[ndarray,
+   ndarray] | ndarray**
 
       Generates pitch predictions for the input signal.
 
@@ -334,6 +334,9 @@ CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
             set. For ‘edge’ either the first or the last value of x is
             used. ‘even’ pads by reflecting the signal on the first or
             last sample and ‘odd’ additionally multiplies it with -1.
+
+         *  **axis** – The axis of *x* over which to run the model
+            along. If not given, the last axis is used.
 
          *  **batch_size** – Number of samples per batch. If
             unspecified, *batch_size* will default to 32. Do not
@@ -409,6 +412,9 @@ CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
             set. For ‘edge’ either the first or the last value of x is
             used. ‘even’ pads by reflecting the signal on the first or
             last sample and ‘odd’ additionally multiplies it with -1.
+
+         *  **axis** – The axis of *x* over which to run the model
+            along. If not given, the last axis is used.
 
          *  **batch_size** – Number of samples per batch. If
             unspecified, *batch_size* will default to 32. Do not

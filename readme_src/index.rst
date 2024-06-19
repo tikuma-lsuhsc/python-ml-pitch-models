@@ -128,8 +128,8 @@ detection more efficiently with a window hop size that is imposed by the model. 
 
 .. code-block:: python
 
-   t_cont, f0_cont, conf_cont = ml_pitch_models.predict(fs, x, 'fcn_929', framewise=False) # default for FCN-F0
-   t_batch, f0_batch, conf_batch = ml_pitch_models.predict(fs, x, 'fcn_929', framewise=True, hop=400) # 50-ms hop size
+   t_cont, f0_cont, conf_cont = ml_pitch_models.predict(fs, x, 'fcn_929') # default for FCN-F0
+   t_batch, f0_batch, conf_batch = ml_pitch_models.predict(fs, x, 'fcn_929', hop=400) # 50-ms hop size
 
 The batch mode (:code:`framewise=True`, which is the only mode CREPE model opearates in) allows a 
 model-independent hop size (:code:`hop` argument, default to a 10-ms interval in samples).
@@ -157,7 +157,7 @@ API Reference
 .. autoclass:: ml_pitch_models.predict
 
 .. autoclass:: ml_pitch_models.CrepeModel
-   :members: bin_frequencies, predict
+   :members: predict
 
 .. autoclass:: ml_pitch_models.FcnF0Model
-   :members: bin_frequencies, native_hop, predict
+   :members: predict

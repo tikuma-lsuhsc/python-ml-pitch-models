@@ -5,8 +5,6 @@ import numpy as np
 from tensorflow import math as tfmath
 import tensorflow as tf
 
-from .utils import cents2freq
-
 
 class ToHertzLayer(Layer):
     """Classifer output to Hertz conversion layer
@@ -22,11 +20,9 @@ class ToHertzLayer(Layer):
 
     def __init__(
         self,
+        fbins: np.ndarray,
         threshold: float,
-        cmin: float,
-        cmax: float,
         nb_average: int = 9,
-        fref: float = 10.0,
         name: str | None = None,
     ):
         super().__init__(trainable=False, name=name)
@@ -34,10 +30,7 @@ class ToHertzLayer(Layer):
         self.threshold = threshold
 
         # the bin number-to-cents bin_freqs
-        self.cmin = tf.constant(cmin, tf.dtypes.float32)
-        self.cmax = tf.constant(cmax, tf.dtypes.float32)
-        self.fref = tf.constant(fref, tf.dtypes.float32)
-
+        self.bin_freqs = tf.reshape(tf.constant(fbins, tf.dtypes.float32), (1, 1, -1))
         self.index_delta = tf.reshape(tf.range(nb_average), (1, 1, -1))
         self.offset = nb_average // 2
 
@@ -45,19 +38,22 @@ class ToHertzLayer(Layer):
         self.start_max: tf.dtypes.int32
         self.built: bool
 
+    def get_config(self):
+        config = super().get_config()
+        config.update({"bin_freqs": self.bin_freqs})
+        return config
+
     def build(self, input_shape):
         ndim = len(input_shape)
         if ndim != 3:
             raise ValueError(
                 "ToHertzLayer expects its input to be 3D Tensor (batch_shape, steps, activation_levels)"
             )
-        self.bin_freqs = cents2freq(
-            tf.reshape(
-                tf.linspace(self.cmin, self.cmax, input_shape[-1]),
-                (1, 1, -1),
-            ),
-            self.fref,
-        )
+        if input_shape[-1] != self.bin_freqs.shape[-1]:
+            raise ValueError(
+                f"ToHertzLayer the number of activation_levels to be {self.bin_freqs.shape[-1]}"
+            )
+
         self.start_max = input_shape[-1] - self.index_delta.shape[-1]
         self.built = True
 
