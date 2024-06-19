@@ -116,23 +116,39 @@ CREPE models were pretrained with 16-kHz signals. In other words,
 will throw a :code:`ValueError` exception because the signal sampling rate :code:`fs` does not match
 the model's input sampling rate (16 kHz). The signal must first be interpolated by 2 to 16 kHz to
 run :code:`x` through a CREPE pretrained model. For example, you can use `scipy.signal.resample_poly 
-<https://docs.scipy.org/doc/scipy-1.12.0/reference/generated/scipy.signal.resample_poly.html#scipy.signal.resample_poly>`.
+<https://docs.scipy.org/doc/scipy-1.12.0/reference/generated/scipy.signal.resample_poly.html#scipy.signal.resample_poly>`_.
 
 
-:code:`framewise` boolean option
-++++++++++++++++++++++++++++++++
+:code:`hop` option
+++++++++++++++++++
 
-The key difference between the CREPE and FCN-F0 models is that the latter can run the pitch 
-detection more efficiently with a window hop size that is imposed by the model. The boolean 
-:code:`framewise` controls this mode of operation (default to the continuous operation):
+The pitches are estimated over a sliding window, producing estimates at a :code:`hop` interval,
+specified in samples. The key difference between the CREPE and FCN-F0 models is that the latter 
+can run the pitch detection more efficiently with a window hop size that is imposed by the model 
+(:code:`native_hop`) in fully convolutional mode of operation. The FCN-F0 models default to the 
+fully convolutional mode if :code:`hop` argument is omitted. To explicitly specify the fully 
+convolutional operation, set :code:`hop` argument to :code:`'native'` or :code:`0`. Otherwise,
+setting :code:`hop` to a positive integer sets the models to operate in a batch mode with the 
+estimate interval :code:`hop/fs` seconds where :code:`fs` is the sampling rate. The CREPE models
+always operate in the batch mode and omission of the :code:`hop` argument defaults to a 10-ms 
+or 160-sample interval.
+
+Examples:
 
 .. code-block:: python
 
-   t_cont, f0_cont, conf_cont = ml_pitch_models.predict(fs, x, 'fcn_929') # default for FCN-F0
-   t_batch, f0_batch, conf_batch = ml_pitch_models.predict(fs, x, 'fcn_929', hop=400) # 50-ms hop size
+   ml_pitch_models.predict(fs, x, 'fcn_993', hop='native') # fully convolutional mode, 1-ms (8-sample) interval
+   ml_pitch_models.predict(fs, x, 'fcn_929', hop='native') # fully convolutional mode, 0.5-ms (4-sample) interval
+   ml_pitch_models.predict(fs, x, 'fcn_929', hop=400) # 50-ms hop size
+   ml_pitch_models.predict(fs, x, 'crepe_tiny', hop=400) # 25-ms hop size
 
-The batch mode (:code:`framewise=True`, which is the only mode CREPE model opearates in) allows a 
-model-independent hop size (:code:`hop` argument, default to a 10-ms interval in samples).
+Note that the same :code:`hop` value results in a different interval due to the difference in 
+the sampling rates between the CREPE and FCN-F0 models.
+
+.. todo::
+
+   Dynamically set the stride of the classifier layer to enable fully convolutional mode with 
+   a hop size which is an integer-multiple of native_hop (may not be performant).
 
 Simultaneous processing of multiple signals
 +++++++++++++++++++++++++++++++++++++++++++
