@@ -116,16 +116,6 @@ class CrepeModel(BaseMLPitchModel, ShortTimeProcess):
         dropout
             Dropout rate (training only). Defaults to 0.25.
 
-    Subclassing CrepeModel
-    ----------------------
-
-        nb_input
-            input frame size. Defaults to None to
-            use the class default (1024).
-
-        nb_freq_bins
-            classifier output size. Defaults to None to use the class default (360).
-
     """
 
     fs: int = 16000  # input sampling rate
@@ -319,7 +309,7 @@ class CrepeModel(BaseMLPitchModel, ShortTimeProcess):
             callbacks: List of `keras.callbacks.Callback` instances.
                 List of callbacks to apply during prediction.
 
-        Returns:
+        :Returns:
             If self.return_f0 is true:
                 - f0: predicted pitches
                 - confidence: pitch prediction confidences
@@ -616,7 +606,7 @@ class FcnF0Model(BaseMLPitchModel, ShortTimeStreamProcess):
                 List of `keras.callbacks.Callback` instances.
                 List of callbacks to apply during prediction.
 
-        Returns:
+        :Returns:
             If self.return_f0 is true:
                 - f0: predicted pitches
                 - confidence: pitch prediction confidences

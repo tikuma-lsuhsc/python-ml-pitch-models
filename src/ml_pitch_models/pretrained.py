@@ -268,7 +268,22 @@ class FCN929Model(FcnF0Model):
         self.weights_file = weights_file
 
 
-def load_model(model, **kwargs):
+def load_model(
+    model: PretrainedModelName = "fcn_993", **kwargs
+) -> FcnF0Model | CrepeModel:
+    """Load pretrained pitch estimation model.
+
+    Args:
+        model
+            Pitch detection deep-learning model.
+
+        **kwargs
+            Passed to the model constructor
+
+    :Returns:
+        Model object
+
+    """
     try:
         return {
             "crepe_full": CrepeFullModel,
@@ -371,8 +386,8 @@ def predict(
             List of `keras.callbacks.Callback` instances.
             List of callbacks to apply during prediction.
 
-    Returns:
-        - t: timestamps 
+    :Returns:
+        - t: timestamps
         - f0: predicted pitches
         - confidence: pitch prediction confidences
 

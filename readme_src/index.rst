@@ -170,7 +170,9 @@ only constructed once.
 API Reference
 -------------
 
-.. autoclass:: ml_pitch_models.predict
+.. autofunction:: ml_pitch_models.predict
+
+.. autofunction:: ml_pitch_models.load_model
 
 .. autoclass:: ml_pitch_models.CrepeModel
    :members: predict

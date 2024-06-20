@@ -190,7 +190,7 @@ faster execution as the model is only constructed once.
 API Reference
 =============
 
-**class ml_pitch_models.predict(x: ArrayLike, fs: int, model:
+**ml_pitch_models.predict(x: ArrayLike, fs: int, model:
 Literal['crepe_full', 'crepe_large', 'crepe_medium', 'crepe_small',
 'crepe_tiny', 'fcn_1953', 'fcn_929', 'fcn_993'] | FcnF0Model |
 CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
@@ -209,16 +209,16 @@ CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
          ``'crepe_large'``, ``'crepe_medium'``, ``'crepe_small'``,
          ``'crepe_tiny'``, ``'fcn_1953'``, ``'fcn_929'``,
          ``'fcn_993'``], `FcnF0Model <#ml_pitch_models.FcnF0Model>`_,
-         `CrepeModel <#ml_pitch_models.CrepeModel>`_] (default:
-         ``'fcn_993'``)) – Pitch detection deep-learning model.
+         `CrepeModel <#ml_pitch_models.CrepeModel>`_], default:
+         ``'fcn_993'``) – Pitch detection deep-learning model.
 
-      *  **hop** (``int`` | ``None`` (default: ``None``)) – The
+      *  **hop** (``int`` | ``None``, default: ``None``) – The
          increment in signal samples, by which the window is shifted
          in each step for frame-wise processing. If None, hop is set
          to (roughly) 10 ms for CREPE models and ‘native’ for FCN-F0
          models
 
-      *  **voice_threshold** (``float`` (default: ``0.5``)) – Voice
+      *  **voice_threshold** (``float``, default: ``0.5``) – Voice
          detection threshold on the classifier confidence level. If
          unvoiced is detected, f0=0 is returned and its confidence
          level indicates the confidence of detecting unvoiced (i.e., 1
@@ -269,11 +269,37 @@ CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
          List of callbacks to apply during prediction.
 
    :Returns:
-      timestamps - f0: predicted pitches - confidence: pitch
-      prediction confidences
+      *  t: timestamps
+
+      *  f0: predicted pitches
+
+      *  confidence: pitch prediction confidences
 
    :Return type:
-      *  t
+      ``tuple``[``ndarray``, ``ndarray``, ``ndarray``]
+
+**ml_pitch_models.load_model(model: Literal['crepe_full',
+'crepe_large', 'crepe_medium', 'crepe_small', 'crepe_tiny',
+'fcn_1953', 'fcn_929', 'fcn_993'] = 'fcn_993', **kwargs) ->
+`FcnF0Model <#ml_pitch_models.FcnF0Model>`_ | `CrepeModel
+<#ml_pitch_models.CrepeModel>`_**
+
+   Load pretrained pitch estimation model.
+
+   :Parameters:
+      *  **model** (``Literal``[``'crepe_full'``, ``'crepe_large'``,
+         ``'crepe_medium'``, ``'crepe_small'``, ``'crepe_tiny'``,
+         ``'fcn_1953'``, ``'fcn_929'``, ``'fcn_993'``], default:
+         ``'fcn_993'``) – Pitch detection deep-learning model.
+
+      *  ****kwargs** – Passed to the model constructor
+
+   :Returns:
+      Model object
+
+   :Return type:
+      `FcnF0Model <#ml_pitch_models.FcnF0Model>`_ | `CrepeModel
+      <#ml_pitch_models.CrepeModel>`_
 
 **class ml_pitch_models.CrepeModel(*layers: tuple[LayerInfo],
 weights_file: str | None = None, hop: int | None = None, return_f0:
@@ -286,42 +312,30 @@ bool = False, voice_threshold: float | None = None, dropout: float =
       *  ***layers** (``tuple``[``LayerInfo``]) – Variable length
          argument list to define CNN layers.
 
-      *  **weights_file** (``str`` | ``None`` (default: ``None``)) –
+      *  **weights_file** (``str`` | ``None``, default: ``None``) –
          path to the weights file to load. It can either be a
          .weights.h5 file or a legacy .h5 weights file. Defaults to
          None.
 
-      *  **hop** (``int`` | ``None`` (default: ``None``)) – The
+      *  **hop** (``int`` | ``None``, default: ``None``) – The
          increment in signal samples, by which the window is shifted
          in each step for frame-wise processing. If None, hop size of
          (roughly) 10 ms is used
 
-      *  **return_f0** (``bool`` (default: ``False``)) – True to
-         return pitch estimates in Hz. Defaults to False to return
-         classifier output.
+      *  **return_f0** (``bool``, default: ``False``) – True to return
+         pitch estimates in Hz. Defaults to False to return classifier
+         output.
 
       *  **framewise** – True to transform the input to a sequence of
          sliding window frames. This option must be True or None for
          CrepeModel. Defaults to True.
 
-      *  **voice_threshold** (``float`` | ``None`` (default:
-         ``None``)) – Classifier output threshold to detect voice.
-         Defaults to None (uses the class default of 0.5.).
+      *  **voice_threshold** (``float`` | ``None``, default: ``None``)
+         – Classifier output threshold to detect voice. Defaults to
+         None (uses the class default of 0.5.).
 
-      *  **dropout** (``float`` (default: ``0.25``)) – Dropout rate
+      *  **dropout** (``float``, default: ``0.25``) – Dropout rate
          (training only). Defaults to 0.25.
-
-
-   Subclassing CrepeModel
-   ----------------------
-
-      nb_input
-         input frame size. Defaults to None to use the class default
-         (1024).
-
-      nb_freq_bins
-         classifier output size. Defaults to None to use the class
-         default (360).
 
    **predict(x: ArrayLike, fs: int, p0: int = 0, p1: int | None =
    None, k_offset: int = 0, padding: Literal['zeros', 'edge', 'even',
@@ -348,19 +362,19 @@ bool = False, voice_threshold: float | None = None, dropout: float =
          *  **fs** (``int``) – Input signal sampling rate in
             Samples/second. This must match model.fs.
 
-         *  **p0** (``int`` (default: ``0``)) – The first element of
+         *  **p0** (``int``, default: ``0``) – The first element of
             the range of slices to calculate. If None then it is set
             to p_min, which is the smallest possible slice.
 
-         *  **p1** (``int`` | ``None`` (default: ``None``)) – The end
+         *  **p1** (``int`` | ``None``, default: ``None``) – The end
             of the array. If None then the largest possible slice is
             used.
 
-         *  **k_offset** (``int`` (default: ``0``)) – Index of first
+         *  **k_offset** (``int``, default: ``0``) – Index of first
             sample (t = 0) in x.
 
          *  **padding** (``Literal``[``'zeros'``, ``'edge'``,
-            ``'even'``, ``'odd'``] (default: ``'zeros'``)) – Kind of
+            ``'even'``, ``'odd'``], default: ``'zeros'``) – Kind of
             values which are added, when the sliding window sticks out
             on either the lower or upper end of the input x. Zeros are
             added if the default ‘zeros’ is set. For ‘edge’ either the
@@ -368,9 +382,9 @@ bool = False, voice_threshold: float | None = None, dropout: float =
             reflecting the signal on the first or last sample and
             ‘odd’ additionally multiplies it with -1.
 
-         *  **axis** (``int`` (default: ``-1``)) – The axis of *x*
-            over which to run the model along. If not given, the last
-            axis is used.
+         *  **axis** (``int``, default: ``-1``) – The axis of *x* over
+            which to run the model along. If not given, the last axis
+            is used.
 
          *  **batch_size** – Number of samples per batch. If
             unspecified, *batch_size* will default to 32. Do not
@@ -395,15 +409,17 @@ bool = False, voice_threshold: float | None = None, dropout: float =
             instances. List of callbacks to apply during prediction.
 
       :Returns:
-         *  f0: predicted pitches
-               *  confidence: pitch prediction confidences
+         If self.return_f0 is true:
+            *  f0: predicted pitches
+
+            *  confidence: pitch prediction confidences
 
          If self.return_f0 is false:
             *  2D array of a sequence of confidence levels of all
                frequency bins
 
       :Return type:
-         If self.return_f0 is true
+         ``tuple``[``ndarray``, ``ndarray``] | ``ndarray``
 
 **class ml_pitch_models.FcnF0Model(*layers: tuple[LayerInfo],
 weights_file: str | None = None, hop: int | None | Literal['native'] =
@@ -435,20 +451,19 @@ None, dropout: float = 0.25)**
          *  **fs** (``int``) – Input signal sampling rate in
             Samples/second. This must match model.fs.
 
-         *  **p0** (``int`` | ``None`` (default: ``None``)) – The
-            first element of the range of slices to calculate. If None
-            then it is set to p_min, which is the smallest possible
-            slice.
+         *  **p0** (``int`` | ``None``, default: ``None``) – The first
+            element of the range of slices to calculate. If None then
+            it is set to p_min, which is the smallest possible slice.
 
-         *  **p1** (``int`` | ``None`` (default: ``None``)) – The end
+         *  **p1** (``int`` | ``None``, default: ``None``) – The end
             of the array. If None then the largest possible slice is
             used.
 
-         *  **k_offset** (``int`` (default: ``0``)) – Index of first
+         *  **k_offset** (``int``, default: ``0``) – Index of first
             sample (t = 0) in x.
 
          *  **padding** (``Literal``[``'zeros'``, ``'edge'``,
-            ``'even'``, ``'odd'``] (default: ``'zeros'``)) – Kind of
+            ``'even'``, ``'odd'``], default: ``'zeros'``) – Kind of
             values which are added, when the sliding window sticks out
             on either the lower or upper end of the input x. Zeros are
             added if the default ‘zeros’ is set. For ‘edge’ either the
@@ -456,9 +471,9 @@ None, dropout: float = 0.25)**
             reflecting the signal on the first or last sample and
             ‘odd’ additionally multiplies it with -1.
 
-         *  **axis** (``int`` (default: ``-1``)) – The axis of *x*
-            over which to run the model along. If not given, the last
-            axis is used.
+         *  **axis** (``int``, default: ``-1``) – The axis of *x* over
+            which to run the model along. If not given, the last axis
+            is used.
 
          *  **batch_size** – Number of samples per batch. If
             unspecified, *batch_size* will default to 32. Do not
@@ -483,12 +498,14 @@ None, dropout: float = 0.25)**
             instances. List of callbacks to apply during prediction.
 
       :Returns:
-         *  f0: predicted pitches
-               *  confidence: pitch prediction confidences
+         If self.return_f0 is true:
+            *  f0: predicted pitches
+
+            *  confidence: pitch prediction confidences
 
          If self.return_f0 is false:
             *  2D array of a sequence of confidence levels of all
                frequency bins
 
       :Return type:
-         If self.return_f0 is true
+         ``tuple``[``ndarray``, ``ndarray``] | ``ndarray``
