@@ -145,10 +145,10 @@ Examples:
 Note that the same :code:`hop` value results in a different interval due to the difference in 
 the sampling rates between the CREPE and FCN-F0 models.
 
-.. todo::
+.. .. note::
 
-   Dynamically set the stride of the classifier layer to enable fully convolutional mode with 
-   a hop size which is an integer-multiple of native_hop (may not be performant).
+..    Dynamically set the stride of the classifier layer to enable fully convolutional mode with 
+..    a hop size which is an integer-multiple of native_hop (may not be performant).
 
 Simultaneous processing of multiple signals
 +++++++++++++++++++++++++++++++++++++++++++

@@ -132,26 +132,39 @@ will throw a ``ValueError`` exception because the signal sampling rate
 ``fs`` does not match the model’s input sampling rate (16 kHz). The
 signal must first be interpolated by 2 to 16 kHz to run ``x`` through
 a CREPE pretrained model. For example, you can use
-*scipy.signal.resample_poly
-<https://docs.scipy.org/doc/scipy-1.12.0/reference/generated/scipy.signal.resample_poly.html#scipy.signal.resample_poly>*.
+`scipy.signal.resample_poly
+<https://docs.scipy.org/doc/scipy-1.12.0/reference/generated/scipy.signal.resample_poly.html#scipy.signal.resample_poly>`_.
 
 
-``framewise`` boolean option
-----------------------------
+``hop`` option
+--------------
 
-The key difference between the CREPE and FCN-F0 models is that the
-latter can run the pitch detection more efficiently with a window hop
-size that is imposed by the model. The boolean ``framewise`` controls
-this mode of operation (default to the continuous operation):
+The pitches are estimated over a sliding window, producing estimates
+at a ``hop`` interval, specified in samples. The key difference
+between the CREPE and FCN-F0 models is that the latter can run the
+pitch detection more efficiently with a window hop size that is
+imposed by the model (``native_hop``) in fully convolutional mode of
+operation. The FCN-F0 models default to the fully convolutional mode
+if ``hop`` argument is omitted. To explicitly specify the fully
+convolutional operation, set ``hop`` argument to ``'native'`` or
+``0``. Otherwise, setting ``hop`` to a positive integer sets the
+models to operate in a batch mode with the estimate interval
+``hop/fs`` seconds where ``fs`` is the sampling rate. The CREPE models
+always operate in the batch mode and omission of the ``hop`` argument
+defaults to a 10-ms or 160-sample interval.
+
+Examples:
 
 .. code:: python
 
-   t_cont, f0_cont, conf_cont = ml_pitch_models.predict(fs, x, 'fcn_929') # default for FCN-F0
-   t_batch, f0_batch, conf_batch = ml_pitch_models.predict(fs, x, 'fcn_929', hop=400) # 50-ms hop size
+   ml_pitch_models.predict(fs, x, 'fcn_993', hop='native') # fully convolutional mode, 1-ms (8-sample) interval
+   ml_pitch_models.predict(fs, x, 'fcn_929', hop='native') # fully convolutional mode, 0.5-ms (4-sample) interval
+   ml_pitch_models.predict(fs, x, 'fcn_929', hop=400) # 50-ms hop size
+   ml_pitch_models.predict(fs, x, 'crepe_tiny', hop=400) # 25-ms hop size
 
-The batch mode (``framewise=True``, which is the only mode CREPE model
-opearates in) allows a model-independent hop size (``hop`` argument,
-default to a 10-ms interval in samples).
+Note that the same ``hop`` value results in a different interval due
+to the difference in the sampling rates between the CREPE and FCN-F0
+models.
 
 
 Simultaneous processing of multiple signals
@@ -181,28 +194,35 @@ API Reference
 Literal['crepe_full', 'crepe_large', 'crepe_medium', 'crepe_small',
 'crepe_tiny', 'fcn_1953', 'fcn_929', 'fcn_993'] | FcnF0Model |
 CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
-= 0.5, **kwargs)**
+= 0.5, axis: int = -1, **kwargs) -> tuple[ndarray, ndarray, ndarray]**
 
    Generates pitch predictions for the input signal.
 
    :Parameters:
-      *  **x** – Input signal(s). For a higher dimensional array, the
-         pitch is detected along the last dimension.
+      *  **x** (ArrayLike) – Input signal(s). For a higher dimensional
+         array, the pitch is detected along the last dimension.
 
-      *  **fs** – Input signal sampling rate in Samples/second. This
-         must match model.fs.
+      *  **fs** (``int``) – Input signal sampling rate in
+         Samples/second. This must match model.fs.
 
-      *  **model** – Pitch detection deep-learning model.
+      *  **model** (``Union``[``Literal``[``'crepe_full'``,
+         ``'crepe_large'``, ``'crepe_medium'``, ``'crepe_small'``,
+         ``'crepe_tiny'``, ``'fcn_1953'``, ``'fcn_929'``,
+         ``'fcn_993'``], `FcnF0Model <#ml_pitch_models.FcnF0Model>`_,
+         `CrepeModel <#ml_pitch_models.CrepeModel>`_] (default:
+         ``'fcn_993'``)) – Pitch detection deep-learning model.
 
-      *  **hop** – The increment in signal samples, by which the
-         window is shifted in each step for frame-wise processing. If
-         None, hop is set to (roughly) 10 ms for CREPE models and
-         ‘native’ for FCN-F0 models
+      *  **hop** (``int`` | ``None`` (default: ``None``)) – The
+         increment in signal samples, by which the window is shifted
+         in each step for frame-wise processing. If None, hop is set
+         to (roughly) 10 ms for CREPE models and ‘native’ for FCN-F0
+         models
 
-      *  **voice_threshold** – Voice detection threshold on the
-         classifier confidence level. If unvoiced is detected, f0=0 is
-         returned and its confidence level indicates the confidence of
-         detecting unvoiced (i.e., 1 - (classifier confidence)).
+      *  **voice_threshold** (``float`` (default: ``0.5``)) – Voice
+         detection threshold on the classifier confidence level. If
+         unvoiced is detected, f0=0 is returned and its confidence
+         level indicates the confidence of detecting unvoiced (i.e., 1
+         - (classifier confidence)).
 
       *  **hop** – The increment in signal samples, by which the
          window is shifted in each step for frame-wise processing. If
@@ -249,40 +269,47 @@ CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
          List of callbacks to apply during prediction.
 
    :Returns:
-      *  f0: predicted pitches
-
-      *  confidence: pitch prediction confidences
+      timestamps - f0: predicted pitches - confidence: pitch
+      prediction confidences
 
    :Return type:
-      tuple[np.ndarray, np.ndarray]
+      *  t
 
-**class ml_pitch_models.CrepeModel(*args, **kwargs)**
+**class ml_pitch_models.CrepeModel(*layers: tuple[LayerInfo],
+weights_file: str | None = None, hop: int | None = None, return_f0:
+bool = False, voice_threshold: float | None = None, dropout: float =
+0.25)**
 
    CREPE pitch estimation model
 
    :Parameters:
-      *  ***layers** – Variable length argument list to define CNN
-         layers.
+      *  ***layers** (``tuple``[``LayerInfo``]) – Variable length
+         argument list to define CNN layers.
 
-      *  **weights_file** – path to the weights file to load. It can
-         either be a .weights.h5 file or a legacy .h5 weights file.
-         Defaults to None.
+      *  **weights_file** (``str`` | ``None`` (default: ``None``)) –
+         path to the weights file to load. It can either be a
+         .weights.h5 file or a legacy .h5 weights file. Defaults to
+         None.
 
-      *  **hop** – The increment in signal samples, by which the
-         window is shifted in each step for frame-wise processing. If
-         None, hop size of (roughly) 10 ms is used
+      *  **hop** (``int`` | ``None`` (default: ``None``)) – The
+         increment in signal samples, by which the window is shifted
+         in each step for frame-wise processing. If None, hop size of
+         (roughly) 10 ms is used
 
-      *  **return_f0** – True to return pitch estimates in Hz.
-         Defaults to False to return classifier output.
+      *  **return_f0** (``bool`` (default: ``False``)) – True to
+         return pitch estimates in Hz. Defaults to False to return
+         classifier output.
 
       *  **framewise** – True to transform the input to a sequence of
          sliding window frames. This option must be True or None for
          CrepeModel. Defaults to True.
 
-      *  **voice_threshold** – Classifier output threshold to detect
-         voice. Defaults to None (uses the class default of 0.5.).
+      *  **voice_threshold** (``float`` | ``None`` (default:
+         ``None``)) – Classifier output threshold to detect voice.
+         Defaults to None (uses the class default of 0.5.).
 
-      *  **dropout** – Dropout rate (training only). Defaults to 0.25.
+      *  **dropout** (``float`` (default: ``0.25``)) – Dropout rate
+         (training only). Defaults to 0.25.
 
 
    Subclassing CrepeModel
@@ -298,7 +325,8 @@ CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
 
    **predict(x: ArrayLike, fs: int, p0: int = 0, p1: int | None =
    None, k_offset: int = 0, padding: Literal['zeros', 'edge', 'even',
-   'odd'] = 'zeros', **kwargs) -> tuple[ndarray, ndarray] | ndarray**
+   'odd'] = 'zeros', axis: int = -1, **kwargs) -> tuple[ndarray,
+   ndarray] | ndarray**
 
       Generates pitch predictions for the input signal.
 
@@ -313,27 +341,36 @@ CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
       *BatchNormalization* that behave differently during inference.
 
       :Parameters:
-         *  **x** – Input signal(s). For a higher dimensional array,
-            the pitch is detected along the last dimension.
+         *  **x** (ArrayLike) – Input signal(s). For a higher
+            dimensional array, the pitch is detected along the last
+            dimension.
 
-         *  **fs** – Input signal sampling rate in Samples/second.
-            This must match model.fs.
+         *  **fs** (``int``) – Input signal sampling rate in
+            Samples/second. This must match model.fs.
 
-         *  **p0** – The first element of the range of slices to
-            calculate. If None then it is set to p_min, which is the
-            smallest possible slice.
+         *  **p0** (``int`` (default: ``0``)) – The first element of
+            the range of slices to calculate. If None then it is set
+            to p_min, which is the smallest possible slice.
 
-         *  **p1** – The end of the array. If None then the largest
-            possible slice is used.
+         *  **p1** (``int`` | ``None`` (default: ``None``)) – The end
+            of the array. If None then the largest possible slice is
+            used.
 
-         *  **k_offset** – Index of first sample (t = 0) in x.
+         *  **k_offset** (``int`` (default: ``0``)) – Index of first
+            sample (t = 0) in x.
 
-         *  **padding** – Kind of values which are added, when the
-            sliding window sticks out on either the lower or upper end
-            of the input x. Zeros are added if the default ‘zeros’ is
-            set. For ‘edge’ either the first or the last value of x is
-            used. ‘even’ pads by reflecting the signal on the first or
-            last sample and ‘odd’ additionally multiplies it with -1.
+         *  **padding** (``Literal``[``'zeros'``, ``'edge'``,
+            ``'even'``, ``'odd'``] (default: ``'zeros'``)) – Kind of
+            values which are added, when the sliding window sticks out
+            on either the lower or upper end of the input x. Zeros are
+            added if the default ‘zeros’ is set. For ‘edge’ either the
+            first or the last value of x is used. ‘even’ pads by
+            reflecting the signal on the first or last sample and
+            ‘odd’ additionally multiplies it with -1.
+
+         *  **axis** (``int`` (default: ``-1``)) – The axis of *x*
+            over which to run the model along. If not given, the last
+            axis is used.
 
          *  **batch_size** – Number of samples per batch. If
             unspecified, *batch_size* will default to 32. Do not
@@ -368,7 +405,10 @@ CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
       :Return type:
          If self.return_f0 is true
 
-**class ml_pitch_models.FcnF0Model(*args, **kwargs)**
+**class ml_pitch_models.FcnF0Model(*layers: tuple[LayerInfo],
+weights_file: str | None = None, hop: int | None | Literal['native'] =
+'native', return_f0: bool = False, voice_threshold: float | None =
+None, dropout: float = 0.25)**
 
    **predict(x: ArrayLike, fs: int, p0: int | None = None, p1: int |
    None = None, k_offset: int = 0, padding: Literal['zeros', 'edge',
@@ -388,27 +428,37 @@ CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
       *BatchNormalization* that behave differently during inference.
 
       :Parameters:
-         *  **x** – Input signal(s). For a higher dimensional array,
-            the pitch is detected along the last dimension.
+         *  **x** (ArrayLike) – Input signal(s). For a higher
+            dimensional array, the pitch is detected along the last
+            dimension.
 
-         *  **fs** – Input signal sampling rate in Samples/second.
-            This must match model.fs.
+         *  **fs** (``int``) – Input signal sampling rate in
+            Samples/second. This must match model.fs.
 
-         *  **p0** – The first element of the range of slices to
-            calculate. If None then it is set to p_min, which is the
-            smallest possible slice.
+         *  **p0** (``int`` | ``None`` (default: ``None``)) – The
+            first element of the range of slices to calculate. If None
+            then it is set to p_min, which is the smallest possible
+            slice.
 
-         *  **p1** – The end of the array. If None then the largest
-            possible slice is used.
+         *  **p1** (``int`` | ``None`` (default: ``None``)) – The end
+            of the array. If None then the largest possible slice is
+            used.
 
-         *  **k_offset** – Index of first sample (t = 0) in x.
+         *  **k_offset** (``int`` (default: ``0``)) – Index of first
+            sample (t = 0) in x.
 
-         *  **padding** – Kind of values which are added, when the
-            sliding window sticks out on either the lower or upper end
-            of the input x. Zeros are added if the default ‘zeros’ is
-            set. For ‘edge’ either the first or the last value of x is
-            used. ‘even’ pads by reflecting the signal on the first or
-            last sample and ‘odd’ additionally multiplies it with -1.
+         *  **padding** (``Literal``[``'zeros'``, ``'edge'``,
+            ``'even'``, ``'odd'``] (default: ``'zeros'``)) – Kind of
+            values which are added, when the sliding window sticks out
+            on either the lower or upper end of the input x. Zeros are
+            added if the default ‘zeros’ is set. For ‘edge’ either the
+            first or the last value of x is used. ‘even’ pads by
+            reflecting the signal on the first or last sample and
+            ‘odd’ additionally multiplies it with -1.
+
+         *  **axis** (``int`` (default: ``-1``)) – The axis of *x*
+            over which to run the model along. If not given, the last
+            axis is used.
 
          *  **batch_size** – Number of samples per batch. If
             unspecified, *batch_size* will default to 32. Do not
