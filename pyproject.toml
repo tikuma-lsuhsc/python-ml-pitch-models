@@ -10,7 +10,7 @@ readme = "README.md"
 keywords = []
 license = { text = "MIT License" }
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: MIT License",
     'Topic :: Multimedia :: Sound/Audio :: Analysis',
 ]
