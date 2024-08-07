@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Literal, get_args
 
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 from numpy.lib.stride_tricks import sliding_window_view
 
 
@@ -105,7 +105,7 @@ def pad_signal(
     p1: int | None = None,
     k_off: int = 0,
     padding: PAD_TYPE = "zeros",
-) -> np.ndarray:
+) -> NDArray:
     """pad (or trim) signal for short-time sliding window analysis
 
     The analysis windows of length m_num is sled over the last axis of the input
@@ -159,7 +159,7 @@ def prepare_signal(
     p1: int | None = None,
     k_off: int = 0,
     padding: PAD_TYPE = "zeros",
-) -> np.ndarray:
+) -> NDArray:
     """normalize and pad signal
 
     Args:
@@ -174,7 +174,7 @@ def prepare_signal(
         padding (PAD_TYPE, optional): signal padding mode. Defaults to "zeros".
 
     Returns:
-        np.ndarray: normalized then padded/trimmed signal to cover windows p0 to p1
+        NDArray: normalized then padded/trimmed signal to cover windows p0 to p1
     """
 
     # normalize the signal samples
@@ -191,7 +191,7 @@ def prepare_frames(
     p1: int | None = None,
     k_off: int = 0,
     padding: PAD_TYPE = "zeros",
-) -> np.ndarray:
+) -> NDArray:
     """Create a normalized sliding window view into the padded signal.
 
     Args:
@@ -218,3 +218,186 @@ def prepare_frames(
     std = np.std(frames, axis=-1, keepdims=True)
     std[std == 0.0] = 1
     return (frames - np.mean(frames, axis=-1, keepdims=True)) / std
+
+
+def viterbi_cat(
+    salience: NDArray,
+    f: NDArray,
+    smoothing_factor: int = 12,
+    self_emission: float = 0.1,
+) -> NDArray:
+    """Find the pitch transition path using the categorical hidden Markov model to induce pitch
+    continuity.
+
+    Parameters
+    ----------
+    salience
+        2D matrix (number of frames by number of pitch candidates) of deep-learning model outcome
+    f
+        1D vector of pitch candidate frequencies
+    smoothing_factor, optional
+        maximum allowable pitch transition in frequency bins, by default 12
+    self_emission, optional
+        self-emission probability, by default 0.1
+
+    Returns
+    -------
+        The chosen sequence of frequency bin indices
+    """
+    from hmmlearn import hmm
+
+    vecSize = salience.shape[1]
+
+    # uniform prior on the starting pitch
+    starting = np.ones(vecSize) / vecSize
+
+    # transition probabilities inducing continuous pitch
+    xx, yy = np.meshgrid(range(vecSize), range(vecSize))
+    transition = np.maximum(smoothing_factor - abs(xx - yy), 0)
+    transition = transition / np.sum(transition, axis=1)[:, None]
+
+    # emission probability = fixed probability for self, evenly distribute the
+    # others
+    emission = np.eye(vecSize) * self_emission + np.ones(shape=(vecSize, vecSize)) * (
+        (1 - self_emission) / vecSize
+    )
+
+    # fix the model parameters because we are not optimizing the model
+    model = hmm.CategoricalHMM(vecSize, starting, transition)
+    model.startprob_, model.transmat_, model.emissionprob_ = (
+        starting,
+        transition,
+        emission,
+    )
+
+    # find the Viterbi path
+    observations = np.argmax(salience, axis=1)
+    path = model.predict(observations.reshape(-1, 1), [len(observations)])
+
+    return path
+
+
+def viterbi_conf(
+    conf: NDArray,
+    f: NDArray,
+    eta_s: float = 0.25,
+    eta_v: float = 0.75,
+    rho_o: float = 0.01,
+    rho_oj: float = 0.35,
+    vu_high_cost: float = 0.5,
+    vu_low_cost: float = 0.05,
+) -> list[int]:
+    """find the pitch transition path based on the pitch detector confidence outputs
+
+    Parameters
+    ----------
+    conf
+        2D matrix (number of frames by number of pitch candidates) of deep-learning model outcome
+    f
+        1D vector of pitch candidate frequencies
+    eta_s, optional
+        Nonharmonic threshold - pitch estimate with a confidence below this value is considered low confidence, likely a nonharmonic frame, by default 0.25
+    eta_v, optional
+        Harmonic threshold - pitch estimate with a confidence above this value is considered high confidence, by default 0.75
+    rho_o, optional
+        Octave cost factor - higher to penalize lower pitch estimate logarithmically more, by default 0.01 (the minimum frequency candidate is penalized by this value)
+    rho_oj, optional
+        Octave jump cost factor - higher to penalize logarithmically large frame-to-frame frequency jump, by default 0.35 (halving or doubling frequency is penalized by this value)
+    vu_high_cost, optional
+        Voiced <-> unvoiced transition cost if next estimate is confidently harmonic/nonharmonic, by default 0.5
+    vu_low_cost, optional
+        voiced <-> unvoiced transition cost if not confidently harmonic/nonharmonic, by default 0.05
+    Returns
+    -------
+        The chosen sequence of frequency bin indices
+    """
+
+    fmax = f[-1]  # pitch ceiling
+    Su = 1 - conf.max(1)  # unvoiced score
+    Sv = conf - rho_o * np.log2(fmax / f)  # voiced score with high frequency penalty
+
+    flog2 = np.log2(f)
+    F1, F2 = np.meshgrid(flog2, flog2)
+    Rho_vv = rho_oj * np.abs(F1 - F2) / (flog2[-1] - flog2[0])
+
+    # voiced<->unvoiced transition costs
+    Tref = conf.max(axis=1, keepdims=True)
+
+    # voiced-to-unvoiced transition requires current frame to have low confidence pitch -> penalize high confidence pitch
+    Tvu = np.where(Tref > eta_s, vu_high_cost, vu_low_cost)
+    # unvoiced-to-voiced transition requires current frame to have high confidence pitch -> penalize low confidence pitch
+    Tuv = np.where(Tref > eta_v, vu_low_cost, vu_high_cost)
+
+    nx, ncands = conf.shape
+    Delta = np.zeros((nx, ncands + 1))
+    Psi = np.zeros((nx, ncands + 1), int)
+    # additional state for nonharmonic
+
+    delta = np.empty((ncands + 1, ncands + 1))
+    Dvv = delta[:-1, :-1]
+    Dvu = delta[:-1, -1:]
+    Duv = delta[-1:, :-1]
+    Duu = delta[-1:, -1:]
+    for i in range(nx):
+        Dlast = Delta[i - 1]  # initial data stored on the last row
+        Dvlast = Dlast[:-1].reshape(-1, 1)
+        Dulast = Dlast[-1]
+        Dvv[:, :] = Dvlast - Rho_vv + Sv[i]  # voiced->voiced
+        Dvu[:] = Dvlast - Tvu[i] + Su[i]  # voiced->unvoiced
+        Duv[:] = Dulast - Tuv[i] + Sv[i]  # unvoiced->voiced
+        Duu[:] = Dulast + Su[i]  # unvoiced->unvoiced
+        Psi[i] = idx = np.argmax(delta, axis=0, keepdims=True)
+        Delta[i] = np.take_along_axis(delta, idx, axis=0)
+
+    j = np.argmax(Delta[-1])
+    return [*reversed([j := psi[j] for psi in Psi[:0:-1]]), j]
+
+
+def tohertz(
+    inputs: NDArray,
+    fbins: NDArray,
+    center: NDArray | None = None,
+    incl_nh: bool = False,
+    threshold: float = 0.5,
+    nb_average: int = 9,
+):
+    # the bin number-to-cents bin_freqs
+    bin_freqs = fbins.reshape(1, -1)
+    index_delta = np.arange(nb_average).reshape(1, -1)
+    offset = nb_average // 2
+
+    start_max = inputs.shape[-1] - index_delta.shape[-1]
+
+    # peak index
+    center = np.argmax(inputs, axis=-1) if center is None else np.asarray(center)
+
+    if incl_nh:
+        tf = center < len(fbins)
+        start = np.clip(center[tf] - offset, 0, start_max).reshape(-1, 1)
+        indices = start + index_delta
+        weights = np.take_along_axis(inputs[tf, :], indices, axis=1)
+    else:
+        start = np.clip(center - offset, 0, start_max).reshape(-1, 1)
+        indices = start + index_delta
+        weights = np.take_along_axis(inputs, indices, axis=1)
+
+    # weighted mean of 9 values
+    c = np.take_along_axis(bin_freqs, indices, axis=1)
+
+    product_sum = np.sum(c * weights, axis=1)
+    weight_sum = np.sum(weights, axis=1)
+
+    if incl_nh:
+        f = np.empty_like(tf, float)
+        f[tf] = product_sum / weight_sum
+        f[~tf] = 0.0
+    else:
+        f = product_sum / weight_sum
+        if threshold > 0:
+            # voice detector
+            confidence = np.take_along_axis(inputs, center.reshape(-1, 1), axis=1)
+            voiced = confidence > threshold
+            f = np.where(voiced, f, 0.0)
+            # confidence = np.where(voiced, confidence, 1.0 - confidence)
+
+    return f

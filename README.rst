@@ -167,6 +167,30 @@ to the difference in the sampling rates between the CREPE and FCN-F0
 models.
 
 
+``postprocessor`` and ``postprocessor_kws`` options
+===================================================
+
+These options enables a dynamical-programming postprocessers. There
+are currently two options:
+
+*  ``'viterbi'`` - Adoptation of Praat’s postprocessor to find the
+   frequency transitions based on
+      the ML model’s confidence vectors. It also detects nonharmonic
+      frames (frames with low confidence level). More information will
+      follow.
+
+*  ``'hmm'`` - The original postprocessor in CREPE and FCN-F0
+   repositories referenced above. It enforces
+      the successive frequencies are close, preventing a large jump.
+
+Examples:
+
+.. code:: python
+
+   ml_pitch_models.predict(fs, x, 'fcn_993', postprocessor='viterbi')
+   ml_pitch_models.predict(fs, x, 'fcn_993', postprocessor='hmm')
+
+
 Simultaneous processing of multiple signals
 -------------------------------------------
 
@@ -193,8 +217,10 @@ API Reference
 **ml_pitch_models.predict(x: ArrayLike, fs: int, model:
 Literal['crepe_full', 'crepe_large', 'crepe_medium', 'crepe_small',
 'crepe_tiny', 'fcn_1953', 'fcn_929', 'fcn_993'] | FcnF0Model |
-CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
-= 0.5, axis: int = -1, **kwargs) -> tuple[ndarray, ndarray, ndarray]**
+CrepeModel = 'fcn_993', hop: int | None = None, harmonic_threshold:
+float | None = None, postprocessor: Literal['viterbi', 'hmm'] | None =
+None, postprocessor_kws: dict | None = None, axis: int = -1, **kwargs)
+-> tuple[ndarray, ndarray, ndarray]**
 
    Generates pitch predictions for the input signal.
 
@@ -218,11 +244,19 @@ CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
          to (roughly) 10 ms for CREPE models and ‘native’ for FCN-F0
          models
 
-      *  **voice_threshold** (``float``, default: ``0.5``) – Voice
-         detection threshold on the classifier confidence level. If
-         unvoiced is detected, f0=0 is returned and its confidence
-         level indicates the confidence of detecting unvoiced (i.e., 1
-         - (classifier confidence)).
+      *  **harmonic_threshold** (``float`` | ``None``, default:
+         ``None``) – Harmonic detection threshold on the classifier
+         confidence level. If confidence level is below this
+         threshold, f0=0 is returned, indicating the frame has no
+         harmonic content.
+
+      *  **postprocessor** (``Optional``[``Literal``[``'viterbi'``,
+         ``'hmm'``]], default: ``None``) – Specify to enable the
+         dynamic programming postprocessor to select the frequency
+         transitions
+
+      *  **postprocessor_kws** (``dict`` | ``None``, default:
+         ``None``) – Specify the options for the postprocessor.
 
       *  **hop** – The increment in signal samples, by which the
          window is shifted in each step for frame-wise processing. If
@@ -269,11 +303,23 @@ CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
          List of callbacks to apply during prediction.
 
    :Returns:
-      *  t: timestamps
+      If postprocessor is assigned:
+         *  t: timestamps
 
-      *  f0: predicted pitches
+         *  f0: predicted pitches
 
-      *  confidence: pitch prediction confidences
+      If self.return_f0 is true:
+         *  t: timestamps
+
+         *  f0: predicted pitches
+
+         *  confidence: pitch prediction confidences
+
+      If self.return_f0 is false:
+         *  t: timestamps
+
+         *  2D array of a sequence of confidence levels of all
+            frequency bins
 
    :Return type:
       ``tuple``[``ndarray``, ``ndarray``, ``ndarray``]
@@ -303,8 +349,9 @@ CrepeModel = 'fcn_993', hop: int | None = None, voice_threshold: float
 
 **class ml_pitch_models.CrepeModel(*layers: tuple[LayerInfo],
 weights_file: str | None = None, hop: int | None = None, return_f0:
-bool = False, voice_threshold: float | None = None, dropout: float =
-0.25)**
+bool = False, harmonic_threshold: float | None = None, postprocessor:
+Literal['viterbi', 'hmm'] | None = None, postprocessor_kws: dict |
+None = None, dropout: float = 0.25)**
 
    CREPE pitch estimation model
 
@@ -330,9 +377,9 @@ bool = False, voice_threshold: float | None = None, dropout: float =
          sliding window frames. This option must be True or None for
          CrepeModel. Defaults to True.
 
-      *  **voice_threshold** (``float`` | ``None``, default: ``None``)
-         – Classifier output threshold to detect voice. Defaults to
-         None (uses the class default of 0.5.).
+      *  **harmonic_threshold** (``float`` | ``None``, default:
+         ``None``) – Classifier output threshold to detect voice.
+         Defaults to None (uses the class default of 0.5.).
 
       *  **dropout** (``float``, default: ``0.25``) – Dropout rate
          (training only). Defaults to 0.25.
@@ -409,6 +456,9 @@ bool = False, voice_threshold: float | None = None, dropout: float =
             instances. List of callbacks to apply during prediction.
 
       :Returns:
+         If postprocessor is assigned:
+            *  f0: predicted pitches
+
          If self.return_f0 is true:
             *  f0: predicted pitches
 
@@ -423,8 +473,9 @@ bool = False, voice_threshold: float | None = None, dropout: float =
 
 **class ml_pitch_models.FcnF0Model(*layers: tuple[LayerInfo],
 weights_file: str | None = None, hop: int | None | Literal['native'] =
-'native', return_f0: bool = False, voice_threshold: float | None =
-None, dropout: float = 0.25)**
+'native', return_f0: bool = False, harmonic_threshold: float | None =
+None, postprocessor: Literal['viterbi', 'hmm'] | None = None,
+postprocessor_kws: dict | None = None, dropout: float = 0.25)**
 
    **predict(x: ArrayLike, fs: int, p0: int | None = None, p1: int |
    None = None, k_offset: int = 0, padding: Literal['zeros', 'edge',
@@ -498,6 +549,9 @@ None, dropout: float = 0.25)**
             instances. List of callbacks to apply during prediction.
 
       :Returns:
+         If postprocessor is assigned:
+            *  f0: predicted pitches
+
          If self.return_f0 is true:
             *  f0: predicted pitches
 

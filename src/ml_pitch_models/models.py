@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 import sys
 
 if sys.version_info < (3, 11):
     from typing_extensions import TypedDict, Required, NotRequired, Literal
 else:
     from typing import TypedDict, Required, NotRequired, Literal
+from numpy.typing import NDArray
 
-from functools import cached_property
+from functools import cached_property, partial
 import numpy as np
 from numpy.typing import ArrayLike
 from numbers import Number
@@ -28,7 +30,7 @@ from tensorflow.keras.layers import (
     Dense,
 )
 
-from .utils import PAD_TYPE, freq2cents
+from .utils import PAD_TYPE, freq2cents, viterbi_cat, viterbi_conf, tohertz
 from .stap import ShortTimeProcess, ShortTimeStreamProcess
 from .layers import ToHertzLayer
 
@@ -51,22 +53,48 @@ class LayerInfo(TypedDict):
 
 class BaseMLPitchModel(Model):
 
-    _voice_threshold: float = 0.5
+    _harmonic_threshold: float = 0.5
     _tohz_nb_average: int = 9
+    _postproc: Callable | None = None
+    _postproc_detects_nh: bool = False
 
-    def __init__(self, voice_threshold: float | None):
+    def __init__(
+        self,
+        harmonic_threshold: float | None,
+        postprocessor: Literal["viterbi", "hmm"] | None,
+        postprocessor_kws: dict | None,
+    ):
+        """base class for machine-learning pitch detector models
 
+        Parameters
+        ----------
+        harmonic_threshold
+            Specify a confidence level threshold to separate harmonic and nonharmonic frames.
+        postprocessor
+            `'viterbi'` to use the viterbi algorithm to resolve the path of the highest collective confidence,
+            or `'hmm'` to use the categorical hidden Markov model to resolve the path. None to skip post-processing.
+        postprocessor_kws
+            keyword arguments for the arguments to run`'viterbi'` or `'hmm'` postprocessor. If None, the default
+            configurations is used.
+        """
         super().__init__()
 
-        if voice_threshold is not None:
-            if not (isinstance(voice_threshold, Number) and voice_threshold >= 0):
-                raise ValueError(f"{voice_threshold=} must be a nonnegative number")
-            self._voice_threshold = voice_threshold
+        if harmonic_threshold is not None:
+            if not (isinstance(harmonic_threshold, Number) and harmonic_threshold >= 0):
+                raise ValueError(f"{harmonic_threshold=} must be a nonnegative number.")
+            self._harmonic_threshold = harmonic_threshold
+        if postprocessor == "viterbi":
+            self._postproc = partial(viterbi_conf, **(postprocessor_kws or {}))
+            self._postproc_detects_nh = True
+        elif postprocessor == "hmm":
+            self._postproc = partial(viterbi_cat, **(postprocessor_kws or {}))
+        elif postprocessor is not None:
+            raise ValueError(f"{postprocessor=} is not a valid option.")
 
     @property
-    def voice_threshold(self) -> float:
+    def harmonic_threshold(self) -> float:
         """Voice detection threshold"""
-        return self._voice_threshold
+        return self._harmonic_threshold
 
     @property
     def tohz_nb_average(self) -> float:
@@ -76,10 +104,13 @@ class BaseMLPitchModel(Model):
     def _create_to_pitch_layers(self, name: str = "to-hertz") -> Layer:
         return ToHertzLayer(
             fbins=self.f,
-            threshold=self.voice_threshold,
+            threshold=self.harmonic_threshold,
             nb_average=self.tohz_nb_average,
             name=name,
         )
+
+    def _tohertz(self, conf: NDArray, center: NDArray = None):
+        return tohertz(conf, self.f, center, self.harmonic_threshold, self._postproc_detects_nh)
 
 
 @saving.register_keras_serializable()
@@ -109,7 +140,7 @@ class CrepeModel(BaseMLPitchModel, ShortTimeProcess):
             sequence of sliding window frames. This option must be True or None
             for CrepeModel. Defaults to True.
 
-        voice_threshold
+        harmonic_threshold
             Classifier output threshold to
             detect voice. Defaults to None (uses the class default of 0.5.).
 
@@ -132,14 +163,18 @@ class CrepeModel(BaseMLPitchModel, ShortTimeProcess):
         weights_file: str | None = None,
         hop: int | None = None,
         return_f0: bool = False,
-        voice_threshold: float | None = None,
+        harmonic_threshold: float | None = None,
+        postprocessor: Literal["viterbi", "hmm"] | None = None,
+        postprocessor_kws: dict | None = None,
         dropout: float = 0.25,
     ):
         if hop is None:
             hop = int(10e-3 * CrepeModel.fs)
 
-        BaseMLPitchModel.__init__(self, voice_threshold)
         ShortTimeProcess.__init__(self, hop)
+        BaseMLPitchModel.__init__(
+            self, harmonic_threshold, postprocessor, postprocessor_kws
+        )
 
         self.input_layers = [
             InputLayer(shape=(self.nb_input,), name="input", dtype="float32"),
@@ -175,7 +210,7 @@ class CrepeModel(BaseMLPitchModel, ShortTimeProcess):
         ]
 
         self.return_f0 = return_f0
-        if return_f0:
+        if return_f0 and self._postproc is None:
             self.output_layers.extend(
                 [
                     Reshape(
@@ -310,6 +345,9 @@ class CrepeModel(BaseMLPitchModel, ShortTimeProcess):
                 List of callbacks to apply during prediction.
 
         :Returns:
+            If postprocessor is assigned:
+                - f0: predicted pitches
+                
             If self.return_f0 is true:
                 - f0: predicted pitches
                 - confidence: pitch prediction confidences
@@ -335,7 +373,11 @@ class CrepeModel(BaseMLPitchModel, ShortTimeProcess):
         if inndim > 1:
             out = out.reshape(*inshape[:-1], -1)
 
-        return (*np.moveaxis(out, -1, 0),) if self.return_f0 else out
+        if self._postproc is None:
+            return (*np.moveaxis(out, -1, 0),) if self.return_f0 else out
+        else:
+            p = self._postproc(out, self.f)
+            return self._tohertz(out, p)
 
 
 ###################################
@@ -373,7 +415,7 @@ class FcnF0Model(BaseMLPitchModel, ShortTimeStreamProcess):
         return_f0: True to return pitch estimates in Hz.
             Defaults to False to return classifier output.
 
-        voice_threshold
+        harmonic_threshold
             Classifier output threshold to
             detect voice. Defaults to None (uses the class default of 0.5.).
 
@@ -387,14 +429,18 @@ class FcnF0Model(BaseMLPitchModel, ShortTimeStreamProcess):
         weights_file: str | None = None,
         hop: int | None | Literal["native"] = "native",
         return_f0: bool = False,
-        voice_threshold: float | None = None,
+        harmonic_threshold: float | None = None,
+        postprocessor: Literal["viterbi", "hmm"] | None = None,
+        postprocessor_kws: dict | None = None,
         dropout: float = 0.25,
     ):
         if hop is None or hop == "native":
             hop = 0
 
-        BaseMLPitchModel.__init__(self, voice_threshold)
         ShortTimeStreamProcess.__init__(self, hop)
+        BaseMLPitchModel.__init__(
+            self, harmonic_threshold, postprocessor, postprocessor_kws
+        )
 
         framewise = bool(self._hop)
 
@@ -454,7 +500,7 @@ class FcnF0Model(BaseMLPitchModel, ShortTimeStreamProcess):
         ]
 
         self.return_f0 = return_f0
-        if return_f0:
+        if return_f0 and self._postproc is None:
             self.output_layers.append(self._create_to_pitch_layers("to-hertz"))
 
         if framewise:
@@ -607,6 +653,9 @@ class FcnF0Model(BaseMLPitchModel, ShortTimeStreamProcess):
                 List of callbacks to apply during prediction.
 
         :Returns:
+            If postprocessor is assigned:
+                - f0: predicted pitches
+
             If self.return_f0 is true:
                 - f0: predicted pitches
                 - confidence: pitch prediction confidences
@@ -648,4 +697,8 @@ class FcnF0Model(BaseMLPitchModel, ShortTimeStreamProcess):
             elif inndim > 2:
                 out = out.reshape(*inshape[:-1], *out.shape[-2:])
 
-        return (*np.moveaxis(out, -1, 0),) if self.return_f0 else out
+        if self._postproc is None:
+            return (*np.moveaxis(out, -1, 0),) if self.return_f0 else out
+        else:
+            p = self._postproc(out, self.f)
+            return self._tohertz(out, p)

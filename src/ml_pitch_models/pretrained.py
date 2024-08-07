@@ -306,7 +306,9 @@ def predict(
     fs: int,
     model: PretrainedModelName | FcnF0Model | CrepeModel = "fcn_993",
     hop: int | None = None,
-    voice_threshold: float = 0.5,
+    harmonic_threshold: float | None = None,
+    postprocessor: Literal["viterbi", "hmm"] | None = None,
+    postprocessor_kws: dict | None = None,
     axis: int = -1,
     **kwargs,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -329,10 +331,16 @@ def predict(
             is shifted in each step for frame-wise processing. If None, hop
             is set to (roughly) 10 ms for CREPE models and 'native' for FCN-F0 models
 
-        voice_threshold
-            Voice detection threshold on the classifier confidence level. If unvoiced
-            is detected, f0=0 is returned and its confidence level indicates the confidence of
-            detecting unvoiced (i.e., 1 - (classifier confidence)).
+        harmonic_threshold
+            Harmonic detection threshold on the classifier confidence level. If confidence level
+            is below this threshold, f0=0 is returned, indicating the frame has no harmonic
+            content.
+
+        postprocessor
+            Specify to enable the dynamic programming postprocessor to select the frequency transitions
+
+        postprocessor_kws
+            Specify the options for the postprocessor.
 
         hop
             The increment in signal samples, by which the window
@@ -387,14 +395,28 @@ def predict(
             List of callbacks to apply during prediction.
 
     :Returns:
-        - t: timestamps
-        - f0: predicted pitches
-        - confidence: pitch prediction confidences
+        If postprocessor is assigned:
+            - t: timestamps
+            - f0: predicted pitches
+            
+        If self.return_f0 is true:
+            - t: timestamps
+            - f0: predicted pitches
+            - confidence: pitch prediction confidences
+
+        If self.return_f0 is false:
+            - t: timestamps
+            - 2D array of a sequence of confidence levels of all frequency bins
 
     """
     if isinstance(model, str):
         model = load_model(
-            model, hop=hop, return_f0=True, voice_threshold=voice_threshold
+            model,
+            hop=hop,
+            return_f0=True,
+            harmonic_threshold=harmonic_threshold,
+            postprocessor=postprocessor,
+            postprocessor_kws=postprocessor_kws,
         )
     elif not isinstance(model, (CrepeFullModel, FcnF0Model)):
         raise ValueError(
