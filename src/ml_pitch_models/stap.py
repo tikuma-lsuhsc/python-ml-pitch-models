@@ -500,7 +500,7 @@ class ShortTimeProcess(ABC):
         """
         p_max = self.p_max(n)  # shorthand
         p0_ = self.p_min if p0 is None else p0
-        p1_ = p_max if p1 is None else p1
+        p1_ = p_max if p1 is None else p1 if p1 >= 0 else p1 + p_max
         if not (self.p_min <= p0_ < p1_ <= p_max):
             raise ValueError(
                 f"Invalid Parameter {p0=}, {p1=}, i.e., "
