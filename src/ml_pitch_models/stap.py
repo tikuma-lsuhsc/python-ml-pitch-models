@@ -28,18 +28,18 @@ class ShortTimeProcess(ABC):
 
     .. currentmodule:: scipy.signal.ShortTimeProcess
 
-    The `~ShortTimeProcess.prepare_frames` prepares a set of windows of size `nb_input`, 
-    sliding over an input signal by `hop` increments. 
+    The `~ShortTimeProcess.prepare_frames` prepares a set of windows of size `nb_input`,
+    sliding over an input signal by `hop` increments.
 
-    The p-th window is centered at the time t[p] = p * `delta_t` = p * `hop` * `T` 
-    where `T` is  the sampling interval of the input signal. 
-    
+    The p-th window is centered at the time t[p] = p * `delta_t` = p * `hop` * `T`
+    where `T` is  the sampling interval of the input signal.
+
     This class also generate frequency bins for the analysis in two scaling modes. If
-    `f_scale = 'linear'`, the q-th frequency bin is placed at 
+    `f_scale = 'linear'`, the q-th frequency bin is placed at
     f[q] = q * `delta_f` + `f_min` with `delta_f` is the bin width and `f_min` is the
-    frequency of the first bin, both in Hz. If `f_scale = 'log'`, the q-th frequency 
-    bin is placed at 
-    f[q] = 2**((q * `delta_f` + `f_min`) / 1200) with `delta_f` is the bin width 
+    frequency of the first bin, both in Hz. If `f_scale = 'log'`, the q-th frequency
+    bin is placed at
+    f[q] = 2**((q * `delta_f` + `f_min`) / 1200) with `delta_f` is the bin width
     in cents and `f_min` is the frequency of the first bin in cents relative to 1 Hz.
 
     Due to the convention of time t = 0 being at the first sample of the input

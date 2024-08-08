@@ -151,15 +151,15 @@ the sampling rates between the CREPE and FCN-F0 models.
 ..    a hop size which is an integer-multiple of native_hop (may not be performant).
 
 :code:`postprocessor` and :code:`postprocessor_kws` options
------------------------------------------------------------
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 These options enables a dynamical-programming postprocessers. There are currently two options: 
 
 * :code:`'viterbi'` - Adoptation of Praat's postprocessor to find the frequency transitions based on 
-                      the ML model's confidence vectors. It also detects nonharmonic frames (frames with 
-                      low confidence level). More information will follow.
+  the ML model's confidence vectors. It also detects nonharmonic frames (frames with 
+  low confidence level). More information will follow.
 * :code:`'hmm'` - The original postprocessor in CREPE and FCN-F0 repositories referenced above. It enforces
-                  the successive frequencies are close, preventing a large jump.
+  the successive frequencies to be close, preventing a large jump.
 
 Examples:
 

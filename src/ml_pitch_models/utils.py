@@ -360,7 +360,7 @@ def tohertz(
     incl_nh: bool = False,
     threshold: float = 0.5,
     nb_average: int = 9,
-):
+) -> NDArray:
     # the bin number-to-cents bin_freqs
     bin_freqs = fbins.reshape(1, -1)
     index_delta = np.arange(nb_average).reshape(1, -1)

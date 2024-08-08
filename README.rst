@@ -168,20 +168,19 @@ models.
 
 
 ``postprocessor`` and ``postprocessor_kws`` options
-===================================================
+---------------------------------------------------
 
 These options enables a dynamical-programming postprocessers. There
 are currently two options:
 
 *  ``'viterbi'`` - Adoptation of Praat’s postprocessor to find the
-   frequency transitions based on
-      the ML model’s confidence vectors. It also detects nonharmonic
-      frames (frames with low confidence level). More information will
-      follow.
+   frequency transitions based on the ML model’s confidence vectors.
+   It also detects nonharmonic frames (frames with low confidence
+   level). More information will follow.
 
 *  ``'hmm'`` - The original postprocessor in CREPE and FCN-F0
-   repositories referenced above. It enforces
-      the successive frequencies are close, preventing a large jump.
+   repositories referenced above. It enforces the successive
+   frequencies to be close, preventing a large jump.
 
 Examples:
 
